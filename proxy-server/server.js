@@ -61,8 +61,10 @@ const httpsAgent = new https.Agent({
   keepAlive: true
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health check endpoint - exposed at both /health and /api/health
+// /api/health alias keeps the URL shape consistent with other API routes,
+// useful for Render health probes and frontend uptime checks.
+app.get(['/health', '/api/health'], (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -185,10 +187,14 @@ app.get('/api/navy-directives', async (req, res) => {
 // Source SPA: https://dso.dla.mil/DONForms/?search=NAVMC
 // Backend API: https://dso.dla.mil/DONNavyForms-RequestService/api/forms/search
 // Cross-origin not allowed by the upstream (no CORS header), so we proxy and
-// filter server-side on formNumber prefix to return only NAVMC-numbered forms.
+// filter server-side to return only NAVMC-numbered forms.
+//
+// Debug mode: append ?debug=1 to return the raw upstream payload (first item
+// plus key inventory) so field names can be verified without redeploying.
 app.get('/api/navmc-forms', async (req, res) => {
   const page = parseInt(req.query.page, 10) || 1;
   const pageSize = Math.min(parseInt(req.query.pageSize, 10) || 100, 100);
+  const debug = req.query.debug === '1';
   const upstream = `https://dso.dla.mil/DONNavyForms-RequestService/api/forms/search?SearchQuery=NAVMC&Page=${page}&PageSize=${pageSize}&SortBy=CreationDate&SortOrder=Descending`;
 
   try {
@@ -203,10 +209,31 @@ app.get('/api/navmc-forms', async (req, res) => {
 
     const data = response.data || {};
     const all = Array.isArray(data.collection) ? data.collection : [];
-    // Filter to strictly NAVMC-numbered forms (formNumber starts with "NAVMC")
+
+    // Debug short-circuit. Returns full first item + top-level key list so we
+    // can identify the real field name for the NAVMC identifier.
+    if (debug) {
+      const sample = all[0] || null;
+      return res.json({
+        upstream,
+        upstreamKeys: Object.keys(data),
+        sampleItemKeys: sample ? Object.keys(sample) : [],
+        sampleItem: sample,
+        totalCount: data.totalCount || 0,
+        sourceCount: all.length
+      });
+    }
+
+    // Case-insensitive NAVMC detection across plausible identifier fields.
+    // Different DLA endpoints use formNumber, FormNumber, number, or formId.
+    // Any field containing the substring "NAVMC" qualifies the record.
+    const NAVMC_FIELDS = ['formNumber', 'FormNumber', 'number', 'Number', 'formId', 'FormId', 'name', 'Name', 'title', 'Title'];
     const navmcOnly = all.filter(f => {
-      const fn = (f.formNumber || '').toUpperCase();
-      return fn.startsWith('NAVMC');
+      if (!f || typeof f !== 'object') return false;
+      return NAVMC_FIELDS.some(k => {
+        const v = f[k];
+        return typeof v === 'string' && v.toUpperCase().includes('NAVMC');
+      });
     });
 
     res.json({
