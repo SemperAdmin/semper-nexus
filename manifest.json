@@ -1,0 +1,23 @@
+{
+  "name": "Nexus",
+  "short_name": "Nexus",
+  "description": "Monitor military directives, messages, and publications",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#0A1424",
+  "background_color": "#0A1424",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "reference", "utilities"],
+  "lang": "en-US",
+  "dir": "ltr",
+  "prefer_related_applications": false
+}

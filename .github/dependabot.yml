@@ -1,0 +1,54 @@
+version: 2
+updates:
+  # Root project dependencies (front-end SPA)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "automated"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      build-tools:
+        patterns:
+          - "vite*"
+          - "terser"
+          - "eslint*"
+          - "prettier*"
+      fontsource:
+        patterns:
+          - "@fontsource*"
+
+  # Proxy server dependencies
+  - package-ecosystem: "npm"
+    directory: "/proxy-server"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "proxy-server"
+      - "automated"
+    commit-message:
+      prefix: "deps(proxy)"
+      include: "scope"
+
+  # GitHub Actions workflow dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "github-actions"

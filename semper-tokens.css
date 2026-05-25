@@ -1,0 +1,338 @@
+/*
+ * Semper Admin Portal - Design Tokens
+ * Generated from SEMPER-STYLE-GUIDE.md v1.2 (2026-05-04)
+ * Source of truth: SemperAdminPortal repo, src/app/globals.css
+ *
+ * Default theme is dark navy. Light parchment is the secondary toggle.
+ * Components reference semantic tokens, not raw hex.
+ */
+
+:root {
+  /* ============================================================
+     2.1 Brand Palette - USMC logo extraction
+     ============================================================ */
+  --color-usmc-scarlet:     #B82230;
+  --color-usmc-scarlet-700: #971826;
+  --color-usmc-scarlet-300: #D14150;
+  --color-marine-blue:      #0F1F3D;
+  --color-marine-blue-700:  #0A1424;
+  --color-marine-blue-300:  #2A3D60;
+  --color-marine-blue-100:  #6B9BD2;
+  --color-parchment:        #F2E5BE;
+  --color-parchment-700:    #D9C994;
+  --color-parchment-300:    #FAF1D8;
+  --color-brass:            #B89042;
+  --color-brass-700:        #8E6E2E;
+  --color-brass-300:        #D4AF67;
+
+  /* ============================================================
+     2.2 Neutral Ramps - warm parchment-tinted light, cool navy dark
+     ============================================================ */
+  --color-neutral-50:  #F8F4E8;
+  --color-neutral-100: #F2EBD4;
+  --color-neutral-200: #E7DFC2;
+  --color-neutral-300: #C9BD96;
+  --color-neutral-400: #A89A72;
+  --color-neutral-500: #8A7E63;
+  --color-neutral-600: #5C5340;
+  --color-neutral-700: #3A3328;
+  --color-neutral-800: #26221A;
+  --color-neutral-900: #181410;
+  --color-neutral-950: #0F0C09;
+
+  --color-ink-50:  #F2E5BE;
+  --color-ink-100: #B5A988;
+  --color-ink-200: #8A7F66;
+  --color-ink-300: #34507A;
+  --color-ink-400: #233A5C;
+  --color-ink-500: #1F345C;
+  --color-ink-600: #182A4D;
+  --color-ink-700: #11203F;
+  --color-ink-800: #0A1424;
+  --color-ink-900: #060E1A;
+
+  /* ============================================================
+     2.3 Role Accents
+     ============================================================ */
+  --color-role-marine:    #B82230;
+  --color-role-leader:    #B89042;
+  --color-role-commander: #0F1F3D;
+  --color-role-admin:     #2F8F5C;
+
+  /* ============================================================
+     2.4 Status
+     ============================================================ */
+  --color-status-fresh: #2F8F5C;
+  --color-status-aging: #C97D1F;
+  --color-status-stale: #B83232;
+  --color-status-info:  #2F5FA8;
+
+  /* ============================================================
+     2.5 Semantic Tokens - Light defaults
+     ============================================================ */
+  --color-background:         #F8F4E8;
+  --color-bg-elev:            #FFFCF4;
+  --color-bg-sunken:          #EFE9D6;
+  --color-foreground:         #1A1610;
+  --color-card:               #FFFCF4;
+  --color-popover:            #FFFCF4;
+  --color-primary:            #B82230;
+  --color-primary-foreground: #FFFCF4;
+  --color-secondary:          #0F1F3D;
+  --color-secondary-foreground: #F2E5BE;
+  --color-muted:              #F2EBD4;
+  --color-muted-foreground:   #5C5340;
+  --color-subtle-foreground:  #8A7E63;
+  --color-accent:             #B89042;
+  --color-accent-foreground:  #1A1610;
+  --color-destructive:        #B83232;
+  --color-border:             #DDD3B5;
+  --color-border-strong:      #C9BD96;
+  --color-ring:               #B82230;
+  --color-surface:            #FFFCF4;
+  --color-surface-2:          #F2EBD4;
+  --color-surface-3:          #E7DFC2;
+
+  /* ============================================================
+     3. Typography
+     ============================================================ */
+  --font-display: "Bebas Neue", "Oswald", system-ui, sans-serif;
+  --font-body:    "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono Variable", "JetBrains Mono", "Cascadia Code", Menlo, monospace;
+
+  /* Type scale */
+  --text-xs:  0.75rem;    /* 12 */
+  --text-sm:  0.8125rem;  /* 13 */
+  --text-base: 0.9375rem; /* 15 */
+  --text-md:  1rem;       /* 16 */
+  --text-lg:  1.0625rem;  /* 17 */
+  --text-xl:  1.25rem;    /* 20 */
+  --text-2xl: 1.375rem;   /* 22 */
+  --text-3xl: 1.75rem;    /* 28 */
+  --text-4xl: 2.25rem;    /* 36 */
+  --text-5xl: 3rem;       /* 48 */
+  --text-6xl: 3.5rem;     /* 56 */
+
+  /* ============================================================
+     4. Spacing Scale
+     ============================================================ */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  32px;
+  --space-8:  40px;
+  --space-9:  48px;
+  --space-10: 56px;
+  --space-11: 64px;
+
+  /* ============================================================
+     5. Radii
+     ============================================================ */
+  --radius-xs:     3px;
+  --radius-sm:     6px;
+  --radius-md:     8px;
+  --radius-lg:    12px;
+  --radius-card:   8px;
+  --radius-button: 6px;
+  --radius-banner: 0px;
+  --radius-chip:   9999px;
+  --radius:        0.5rem;
+
+  /* ============================================================
+     6. Shadows - Light defaults
+     ============================================================ */
+  --shadow-sm:          0 1px 2px rgba(26,22,16,.05), 0 0 0 1px rgba(26,22,16,.04);
+  --shadow-card:        0 1px 2px rgba(26,22,16,.05), 0 0 0 1px rgba(26,22,16,.04);
+  --shadow-md:          0 2px 4px rgba(26,22,16,.06), 0 10px 28px rgba(26,22,16,.08);
+  --shadow-card-strong: 0 2px 4px rgba(26,22,16,.06), 0 10px 28px rgba(26,22,16,.08);
+  --shadow-lg:          0 18px 52px rgba(26,22,16,.20);
+
+  /* ============================================================
+     7. Layout Constants
+     ============================================================ */
+  --topbar-h: 56px;
+  --tree-w:   272px;
+  --toc-w:    232px;
+
+  /* ============================================================
+     8. Motion
+     ============================================================ */
+  --motion-fast:    120ms;
+  --motion-default: 180ms;
+  --motion-slow:    240ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:  cubic-bezier(0.7, 0, 0.84, 0);
+}
+
+/* ============================================================
+   Dark Theme Overrides - default per the style guide
+   ============================================================ */
+.dark, body.dark-theme {
+  --color-background:         #0A1424;
+  --color-bg-elev:            #11203F;
+  --color-bg-sunken:          #060E1A;
+  --color-foreground:         #F2E5BE;
+  --color-card:               #11203F;
+  --color-popover:            #11203F;
+  --color-primary:            #D14150;
+  --color-primary-foreground: #060E1A;
+  --color-secondary:          #2A3D60;
+  --color-secondary-foreground: #F2E5BE;
+  --color-muted:              #182A4D;
+  --color-muted-foreground:   #B5A988;
+  --color-subtle-foreground:  #8A7F66;
+  --color-accent:             #D4AF67;
+  --color-accent-foreground:  #060E1A;
+  --color-border:             #233A5C;
+  --color-border-strong:      #34507A;
+  --color-surface:            #11203F;
+  --color-surface-2:          #182A4D;
+  --color-surface-3:          #1F345C;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4), 0 0 0 1px rgba(242,229,190,.04);
+  --shadow-md: 0 2px 4px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.45);
+  --shadow-lg: 0 18px 52px rgba(0,0,0,.55);
+}
+
+/* ============================================================
+   Self-hosted variable fonts from /fonts/ (copied at build via vite-plugin-static-copy from @fontsource packages).
+   Phase 1.3c: jsdelivr CDN dependency removed for SC-7 boundary protection.
+   ============================================================ */
+@font-face {
+  font-family: "Bebas Neue";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/bebas-neue-latin-400-normal.woff2") format("woff2"),
+       url("fonts/bebas-neue-latin-400-normal.woff") format("woff");
+}
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/inter-latin-wght-italic.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+/* ============================================================
+   3.4 Text Treatments
+   ============================================================ */
+.eyebrow {
+  font: 700 11px/1 var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-muted-foreground);
+}
+
+.mono-citation {
+  font: 500 13px var(--font-mono);
+  color: var(--color-subtle-foreground);
+}
+
+/* ============================================================
+   9.1 Gradient Text Accent - hero only, single keyword
+   ============================================================ */
+.gradient-accent {
+  background: linear-gradient(95deg,
+    var(--color-usmc-scarlet) 0%,
+    var(--color-usmc-scarlet-300) 35%,
+    var(--color-brass-300) 75%,
+    var(--color-brass) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ============================================================
+   9.2 Ambient Bloom
+   ============================================================ */
+.ambient-bloom {
+  position: relative;
+  isolation: isolate;
+}
+
+.ambient-bloom::before {
+  content: "";
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  max-width: 720px;
+  height: 320px;
+  background: radial-gradient(ellipse at center,
+    color-mix(in srgb, var(--color-usmc-scarlet) 10%, transparent) 0%,
+    color-mix(in srgb, var(--color-marine-blue-300) 8%, transparent) 40%,
+    transparent 75%);
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(20px);
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out);
+}
+
+.dark .ambient-bloom::before,
+body.dark-theme .ambient-bloom::before {
+  opacity: 1;
+}
+
+/* ============================================================
+   9.3 Floating Pill Chrome
+   ============================================================ */
+.chrome-floating {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg-elev) 92%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-md);
+}
+
+/* ============================================================
+   10. Selection and Focus
+   ============================================================ */
+:focus-visible {
+  outline: 3px solid var(--color-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--color-brass);
+  color: var(--color-neutral-950);
+}
+
+/* ============================================================
+   Accessibility: prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

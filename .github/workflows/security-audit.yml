@@ -1,0 +1,44 @@
+name: Security Audit
+
+on:
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Weekly Monday 14:00 UTC
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit-root:
+    name: npm audit (root SPA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install
+        run: npm ci
+      - name: Audit (fail on high or critical)
+        run: npm audit --audit-level=high
+
+  npm-audit-proxy:
+    name: npm audit (proxy-server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: proxy-server/package-lock.json
+      - name: Install
+        working-directory: proxy-server
+        run: npm ci
+      - name: Audit (fail on high or critical)
+        working-directory: proxy-server
+        run: npm audit --audit-level=high

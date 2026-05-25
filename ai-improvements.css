@@ -1,0 +1,108 @@
+/* CSS Custom Properties for better theming and maintainability */
+:root {
+  /* Cache indicator colors */
+  --color-cached-bg: #4CAF50;
+  --color-cached-text: white;
+  --color-new-bg: #FF9800;
+  --color-new-text: white;
+
+  
+
+  /* Button active states */
+  --color-ai-btn-active: #2196F3;
+  --color-ai-btn-active-hover: #1976D2;
+
+  /* Error message colors */
+  --color-warning-bg: #FFF3CD;
+  --color-warning-border: #FFC107;
+  --color-warning-text: #856404;
+  --color-info-bg: #D1ECF1;
+  --color-info-border: #17A2B8;
+  --color-info-text: #0C5460;
+}
+
+/* Dark theme color overrides */
+body.dark-theme {
+  --color-cached-bg: #66BB6A;
+  --color-new-bg: #FFA726;
+  --color-ai-btn-active: #42A5F5;
+  --color-ai-btn-active-hover: #2196F3;
+  --color-warning-bg: #3e3000;
+  --color-warning-text: #FFC107;
+  --color-info-bg: #003544;
+  --color-info-text: #17A2B8;
+}
+
+/* Cache indicator badge */
+.cache-indicator {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  background: var(--color-cached-bg);
+  color: var(--color-cached-text);
+  font-size: 0.75rem;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.cache-indicator.new {
+  background: var(--color-new-bg);
+  color: var(--color-new-text);
+  animation: pulse 2s ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Loading state for AI button */
+
+@keyframes buttonLoading {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Fade in animation for Details button */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Dark theme for new elements */
+body.dark-theme .cache-indicator {
+  background: #66BB6A;
+}
+
+body.dark-theme .cache-indicator.new {
+  background: #FFA726;
+}
+
+/* Compact expand button improvements */
+.compact-expand-btn {
+  margin-left: 5px;
+  transition: all 0.2s ease;
+}
+
+/* Error message improvements */
+.error-message.warning {
+  background: var(--color-warning-bg);
+  border-left-color: var(--color-warning-border);
+  color: var(--color-warning-text);
+}
+
+.error-message.info {
+  background: var(--color-info-bg);
+  border-left-color: var(--color-info-border);
+  color: var(--color-info-text);
+}

@@ -1,0 +1,59 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "no-console": "off",
+    "prefer-const": "warn",
+    "no-var": "warn",
+    "eqeqeq": [
+      "warn",
+      "always"
+    ],
+    "curly": [
+      "warn",
+      "all"
+    ],
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error",
+    "no-alert": "warn",
+    "no-debugger": "warn"
+  },
+  "globals": {
+    "allMaradmins": "writable",
+    "allMcpubs": "writable",
+    "allAlnavs": "writable",
+    "allAlmars": "writable",
+    "allDodForms": "writable",
+    "allIgmcChecklists": "writable",
+    "allSecnavs": "writable",
+    "allJtrs": "writable",
+    "allDodFmr": "writable",
+    "currentMessages": "writable",
+    "currentMessageType": "writable",
+    "webVitals": "readonly",
+    "SafeHTML": "readonly",
+    "NexusIcons": "readonly",
+    "DOMPurify": "readonly",
+    "sanitizeInPlace": "readonly",
+    "allNavmcForms": "writable"
+  }
+}

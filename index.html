@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Content Security Policy for enhanced security -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  connect-src 'self'
+    https://www.marines.mil
+    https://www.mynavyhr.navy.mil
+    https://www.secnav.navy.mil
+    https://www.igmc.marines.mil
+    https://www.esd.whs.mil
+    https://comptroller.war.gov
+    https://www.travel.dod.mil
+    https://semper-nexus-proxy.onrender.com
+    http://localhost:3000;
+  font-src 'self' data:;
+  style-src-elem 'self' 'unsafe-inline';
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self';
+  upgrade-insecure-requests;
+">
+<!-- Additional Security Headers -->
+<!-- Note: X-Frame-Options only works via HTTP headers, not meta tags -->
+<!-- Configure at hosting level (GitHub Pages, Render, etc.) for frame protection -->
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(), camera=(), payment=(), usb=()">
+<title>Nexus by Semper Admin</title>
+<meta name="description" content="Monitor military directives, messages, and publications. Track MARADMINs, ALMARs, MCPUBs, JTR, DoD Forms and more.">
+<meta name="theme-color" content="#0A1424">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="semper-tokens.css?v=3">
+<link rel="stylesheet" href="style.css?v=28">
+<link rel="stylesheet" href="ai-improvements.css?v=2">
+<script src="vendor/purify.min.js"></script>
+<script src="lib/safe-html.js?v=1"></script>
+<script src="lib/icons.js?v=1" defer></script>
+<script src="lib/a11y.js?v=1" defer></script>
+</head>
+<body>
+<!-- Skip Navigation Link for Keyboard Accessibility -->
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<header>
+  <div class="branding">
+    <img src="logo.png" alt="Nexus Logo" class="header-logo">
+    <div class="header-text">
+      <h1 class="gradient-accent">Nexus</h1>
+      <p class="byline">by Semper Admin</p>
+    </div>
+  </div>
+  <p class="subtitle">Monitor military directives, messages, and publications</p>
+  <div class="controls">
+    <button id="refreshBtn" aria-label="Refresh data from server"><span class="icon-wrapper" data-icon="arrows-rotate"></span> Refresh</button>
+    <button id="themeToggle" aria-label="Toggle dark mode"><span class="icon-wrapper" data-icon="moon"></span> Dark Mode</button>
+  </div>
+</header>
+<main id="main-content">
+  <div class="message-type-tabs" role="tablist" aria-label="Message type selection">
+    <button class="message-type-btn active" data-type="maradmin" role="tab" aria-selected="true" aria-controls="results">MARADMIN <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn" data-type="almar" role="tab" aria-selected="false" aria-controls="results">ALMAR <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn" data-type="alnav" role="tab" aria-selected="false" aria-controls="results">ALNAV <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn" data-type="secnav" role="tab" aria-selected="false" aria-controls="results">SECNAV <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn" data-type="mcpub" role="tab" aria-selected="false" aria-controls="results">MCPEL <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn" data-type="dodfmr" role="tab" aria-selected="false" aria-controls="results">DODFMR <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn" data-type="jtr" role="tab" aria-selected="false" aria-controls="results">DTMO (JTR) <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn" data-type="igmc" role="tab" aria-selected="false" aria-controls="results">FA_CHECKLISTS <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn" data-type="navmc" role="tab" aria-selected="false" aria-controls="results">NAVMC_FORMS <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn" data-type="dodforms" role="tab" aria-selected="false" aria-controls="results">DD_FORMS <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn message-type-btn--inactive" data-type="paa" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Coming soon">PAA</button>
+    <button class="message-type-btn message-type-btn--inactive" data-type="paan" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Coming soon">PAAN</button>
+    <button class="message-type-btn message-type-btn--inactive" data-type="tan" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Coming soon">TAN</button>
+    <button class="message-type-btn message-type-btn--inactive" data-type="fan" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Coming soon">FAN</button>
+    <button class="message-type-btn message-type-btn--inactive" data-type="ican" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Coming soon">ICAN</button>
+    <button class="message-type-btn all-messages-btn" data-type="all" role="tab" aria-selected="false" aria-controls="results">All Messages <span class="tab-counter" aria-label="0 messages">0</span></button>
+  </div>
+  <div class="filters-section">
+    <div class="search-container">
+      <label for="searchInput" class="sr-only">Search messages</label>
+      <input type="text" id="searchInput" placeholder="Search by ID, subject, or keywords..." aria-describedby="searchHelp" />
+      <button id="clearSearch" class="clear-btn" aria-label="Clear search">✕</button>
+      <span id="searchHelp" class="sr-only">Enter keywords to filter messages</span>
+    </div>
+    <div class="filter-controls">
+      <div class="quick-filters" role="group" aria-label="Date range filters">
+        <button class="quick-filter-btn" data-days="1" aria-pressed="false">Today</button>
+        <button class="quick-filter-btn active" data-days="7" aria-pressed="true">This Week</button>
+        <button class="quick-filter-btn" data-days="14" aria-pressed="false">2 Weeks</button>
+        <button class="quick-filter-btn" data-days="30" aria-pressed="false">This Month</button>
+        <button class="quick-filter-btn" data-days="60" aria-pressed="false">60 Days</button>
+        <button class="quick-filter-btn" data-days="90" aria-pressed="false">90 Days</button>
+        <button class="quick-filter-btn" data-days="180" aria-pressed="false">180 Days</button>
+        <button class="quick-filter-btn" data-days="0" aria-pressed="false">All</button>
+      </div>
+    </div>
+  </div>
+  <div id="status" class="status" role="status" aria-live="polite">Loading cached data...</div>
+  <div id="error" class="error hidden" role="alert" aria-live="assertive"></div>
+  <div id="summaryStats" class="summary-stats hidden"></div>
+  <div id="results" class="results" role="tabpanel" aria-label="Message results" tabindex="-1"></div>
+</main>
+<footer>
+  <p class="nexus-branding">A Semper Admin Project</p>
+  <p>Data source Last updated: <span id="lastUpdate">Never</span></p>
+  <p class="footer-note">Auto-refreshes every 10 minutes • Data cached for offline access</p>
+</footer>
+
+<!-- Feedback Widget -->
+<button id="feedbackBtn" class="feedback-btn" title="Share Feedback">💬 Feedback</button>
+
+<!-- Feedback Modal -->
+<div id="feedbackModal" class="feedback-modal hidden" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle">
+  <div class="feedback-modal-content">
+    <div class="feedback-modal-header">
+      <h2 id="feedbackModalTitle">Share Your Feedback</h2>
+      <button id="closeFeedbackModal" class="feedback-close-btn" aria-label="Close feedback modal">✕</button>
+    </div>
+    <form id="feedbackForm">
+      <div class="feedback-form-group">
+        <label for="feedbackType">Feedback Type <span class="required">*</span></label>
+        <select id="feedbackType" required>
+          <option value="">Select type...</option>
+          <option value="bug">Bug Report</option>
+          <option value="feature">Feature Request</option>
+          <option value="ux">UX Suggestion</option>
+        </select>
+      </div>
+
+      <div class="feedback-form-group">
+        <label for="feedbackTitle">Title <span class="required">*</span></label>
+        <input type="text" id="feedbackTitle" placeholder="Brief summary of your feedback" required maxlength="100">
+      </div>
+
+      <div class="feedback-form-group">
+        <label for="feedbackDescription">Description <span class="required">*</span></label>
+        <textarea id="feedbackDescription" placeholder="Please describe your feedback in detail..." required rows="6"></textarea>
+      </div>
+
+      <p class="feedback-anonymous-note"><span class="icon-wrapper" data-icon="shield-halved"></span> Submissions are anonymous. No email or user identity is collected.</p>
+
+      <div class="feedback-form-actions">
+        <button type="button" id="cancelFeedback" class="feedback-btn-secondary">Cancel</button>
+        <button type="submit" class="feedback-btn-primary">Submit Feedback</button>
+      </div>
+
+      <div id="feedbackStatus" class="feedback-status hidden"></div>
+    </form>
+  </div>
+</div>
+
+<script src="lib/fa-checklists.js"></script>
+<script src="lib/secnav-data.js"></script>
+<script src="lib/alnav-data.js"></script>
+
+<script src="vendor/web-vitals.iife.js"></script>
+
+<script src="app.js?v=27"></script>
+
+<!-- Service Worker Registration for PWA -->
+<script src="pwa-init.js"></script>
+</body>
+</html>
