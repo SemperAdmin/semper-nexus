@@ -195,7 +195,10 @@ app.get('/api/navmc-forms', async (req, res) => {
   const page = parseInt(req.query.page, 10) || 1;
   const pageSize = Math.min(parseInt(req.query.pageSize, 10) || 100, 100);
   const debug = req.query.debug === '1';
-  const upstream = `https://dso.dla.mil/DONNavyForms-RequestService/api/forms/search?SearchQuery=NAVMC&Page=${page}&PageSize=${pageSize}&SortBy=CreationDate&SortOrder=Descending`;
+  // Sort by FormNumber Ascending so NAVMC-prefixed forms cluster on early
+  // pages. CreationDate Descending surfaces warehouse products tagged with
+  // command=NAVMC but with non-NAVMC form numbers (USSF, JFOL, etc.).
+  const upstream = `https://dso.dla.mil/DONNavyForms-RequestService/api/forms/search?SearchQuery=NAVMC&Page=${page}&PageSize=${pageSize}&SortBy=FormNumber&SortOrder=Ascending`;
 
   try {
     const response = await axios.get(upstream, {
@@ -224,16 +227,13 @@ app.get('/api/navmc-forms', async (req, res) => {
       });
     }
 
-    // Case-insensitive NAVMC detection across plausible identifier fields.
-    // Different DLA endpoints use formNumber, FormNumber, number, or formId.
-    // Any field containing the substring "NAVMC" qualifies the record.
-    const NAVMC_FIELDS = ['formNumber', 'FormNumber', 'number', 'Number', 'formId', 'FormId', 'name', 'Name', 'title', 'Title'];
+    // Strict filter: formNumber must begin with NAVMC. The upstream returns
+    // 1764 records tagged command=NAVMC, but most have non-NAVMC formNumbers
+    // (USSF, JFOL warehouse products). Marines expect to see actual
+    // NAVMC-numbered forms in this tab.
     const navmcOnly = all.filter(f => {
-      if (!f || typeof f !== 'object') return false;
-      return NAVMC_FIELDS.some(k => {
-        const v = f[k];
-        return typeof v === 'string' && v.toUpperCase().includes('NAVMC');
-      });
+      const fn = (f?.formNumber || '').toUpperCase().trim();
+      return fn.startsWith('NAVMC');
     });
 
     res.json({
