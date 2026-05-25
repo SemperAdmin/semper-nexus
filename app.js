@@ -9,7 +9,8 @@ const APPLICATION_CONFIG = {
     igmc:     { subjectSource: 'subject', showDetails: true, prependIdToTitle: false, hideIdColumn: false },
     alnav:    { subjectSource: 'subject', showDetails: true, prependIdToTitle: false, hideIdColumn: false },
     secnav:   { subjectSource: 'subject', showDetails: true, prependIdToTitle: false, hideIdColumn: false },
-    jtr:      { subjectSource: 'subject', showDetails: true, prependIdToTitle: false, hideIdColumn: true }
+    jtr:      { subjectSource: 'subject', showDetails: true, prependIdToTitle: false, hideIdColumn: true },
+    dodi:     { subjectSource: 'subject', showDetails: false, prependIdToTitle: true, hideIdColumn: true }
   }
 };
 
@@ -293,7 +294,8 @@ let allNavmcForms = []; // NAVMC Forms
 let allSecnavs = []; // Store all SECNAV directives
 let allJtrs = []; // Store all JTR (Joint Travel Regulations) updates
 let allDodFmr = []; // Store all DoD FMR changes
-let currentMessageType = 'maradmin'; // Track current view: 'maradmin', 'mcpub', 'alnav', 'almar', 'dodforms', 'igmc', 'secnav', 'jtr', 'dodfmr', or 'all'
+let allDodi = []; // DoD Issuances (DoDI scraped from esd.whs.mil)
+let currentMessageType = 'maradmin'; // Track current view: 'maradmin', 'mcpub', 'alnav', 'almar', 'dodforms', 'igmc', 'secnav', 'jtr', 'dodfmr', 'dodi', or 'all'
 
 // Init
 document.addEventListener("DOMContentLoaded", () => {
@@ -410,6 +412,9 @@ async function fetchAllFeeds() {
   // Fetch NAVMC Forms via DLA DSO API
   await fetchNavmcForms();
 
+  // Fetch DoD Issuances (DoDI) via Render proxy (scrapes esd.whs.mil)
+  await fetchDodi();
+
   // Update display
   filterMessages();
   updateLastUpdate();
@@ -470,6 +475,61 @@ async function fetchNavmcForms() {
   } catch (error) {
     ErrorAnalytics.track('fetchNavmcForms', error, { source: 'DLA DSO via proxy' });
     console.error('[NAVMC] Failed:', error.message);
+  }
+}
+
+// Fetch DoD Issuances (DoDI) from the Render proxy, which scrapes
+// https://www.esd.whs.mil/Directives/issuances/dodi/ and parses the DNN
+// table into JSON. Single page upstream, proxy caches for 1 hour.
+async function fetchDodi() {
+  if (!CUSTOM_PROXY_URL) {
+    console.warn('[DODI] CUSTOM_PROXY_URL not set; skipping DoDI fetch');
+    return;
+  }
+  console.log('[DODI] Fetching DoD Issuances from proxy...');
+  try {
+    const url = `${CUSTOM_PROXY_URL}/api/dodi?page=1&pageSize=2000`;
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    const items = Array.isArray(data.collection) ? data.collection : [];
+    allDodi = items.map(d => {
+      // Issuance Date format from esd.whs.mil is M/D/YYYY. Parse for sort.
+      const pubDate = d.issuanceDate || '';
+      const pubDateObj = pubDate ? new Date(pubDate) : new Date(0);
+      const id = d.id || '';
+      const subject = (d.subject || '').replace(/<[^>]+>/g, '').trim() || id;
+      const chSuffix = d.chNumber && d.chDate ? ` (${d.chNumber} ${d.chDate})` : '';
+      return {
+        id: id,
+        numericId: id,
+        subject: subject,
+        title: id,
+        link: d.link || 'https://www.esd.whs.mil/Directives/issuances/dodi/',
+        pubDate: pubDate,
+        pubDateObj: pubDateObj,
+        summary: `${d.opr || ''}${chSuffix}`.trim(),
+        description: `OPR ${d.opr || 'n/a'}. ${d.chNumber ? 'Change ' + d.chNumber + ' on ' + d.chDate + '. ' : ''}${d.relatedMemo ? 'Related memo ' + d.relatedMemo + '.' : ''}`.trim(),
+        category: 'DoD Issuance',
+        type: 'dodi',
+        searchText: `${id} ${subject} ${d.opr || ''} ${d.relatedMemo || ''}`.toLowerCase(),
+        detailsFetched: true,
+        maradminNumber: null
+      };
+    });
+    // Sort newest issuance first when date is parseable, then by id.
+    allDodi.sort((a, b) => {
+      const diff = b.pubDateObj - a.pubDateObj;
+      if (!isNaN(diff) && diff !== 0) return diff;
+      return a.id.localeCompare(b.id);
+    });
+    console.log(`[DODI] Loaded ${allDodi.length} DoD Issuances`);
+    cacheData();
+  } catch (error) {
+    ErrorAnalytics.track('fetchDodi', error, { source: 'esd.whs.mil via proxy' });
+    console.error('[DODI] Failed:', error.message);
   }
 }
 
@@ -1593,9 +1653,11 @@ function filterMessages() {
     allMessages = [...allAlnavs];
   } else if (currentMessageType === 'navmc') {
     allMessages = [...allNavmcForms];
+  } else if (currentMessageType === 'dodi') {
+    allMessages = [...allDodi];
   } else if (currentMessageType === 'all') {
     // Exclude ALNAV and SECNAV from "All Messages"
-    allMessages = [...allMaradmins, ...allMcpubs, ...allAlmars, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr];
+    allMessages = [...allMaradmins, ...allMcpubs, ...allAlmars, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi];
     allMessages.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
   }
 
@@ -1732,9 +1794,11 @@ function updateResultsCount() {
     totalCount = allDodForms.length;
   } else if (currentMessageType === 'navmc') {
     totalCount = allNavmcForms.length;
+  } else if (currentMessageType === 'dodi') {
+    totalCount = allDodi.length;
   } else if (currentMessageType === 'all') {
     // Exclude ALNAV and SECNAV from All Messages count
-    totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allDodForms.length + allNavmcForms.length + allJtrs.length + allDodFmr.length;
+    totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allDodForms.length + allNavmcForms.length + allJtrs.length + allDodFmr.length + allDodi.length;
   }
 
   const labelMap = {
@@ -1744,7 +1808,8 @@ function updateResultsCount() {
     navmc: 'NAVMC Forms',
     mcpub: 'MCPEL Items',
     jtr: 'DTMO Updates',
-    dodfmr: 'DODFMR Changes'
+    dodfmr: 'DODFMR Changes',
+    dodi: 'DoD Issuances'
   };
   const typeLabel = labelMap[currentMessageType] || (currentMessageType.toUpperCase() + 's');
 
@@ -1825,6 +1890,10 @@ function updateTabCounters() {
         count = getFilteredCount(allDodFmr);
         baseText = 'DODFMR';
         break;
+      case 'dodi':
+        count = getFilteredCount(allDodi);
+        baseText = 'DODI';
+        break;
       case 'paa':
       case 'paan':
       case 'tan':
@@ -1835,7 +1904,7 @@ function updateTabCounters() {
         return;
       case 'all':
         // Exclude ALNAV and SECNAV from All Messages count
-        count = getFilteredCount([...allMaradmins, ...allMcpubs, ...allAlmars, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr]);
+        count = getFilteredCount([...allMaradmins, ...allMcpubs, ...allAlmars, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi]);
         baseText = 'All Messages';
         break;
     }
@@ -1868,9 +1937,11 @@ function renderSummaryStats() {
     totalCount = allJtrs.length;
   } else if (currentMessageType === 'dodfmr') {
     totalCount = allDodFmr.length;
+  } else if (currentMessageType === 'dodi') {
+    totalCount = allDodi.length;
   } else if (currentMessageType === 'all') {
     // Exclude ALNAV and SECNAV from total count
-    totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allDodForms.length + allIgmcChecklists.length + allNavmcForms.length + allJtrs.length + allDodFmr.length;
+    totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allDodForms.length + allIgmcChecklists.length + allNavmcForms.length + allJtrs.length + allDodFmr.length + allDodi.length;
   }
 
   // Get date range
@@ -2012,7 +2083,8 @@ function renderCompactView(arr) {
       'jtr':      'DTMO',
       'dodfmr':   'DODFMR',
       'igmc':     'FA CHECKLIST',
-      'navmc':    'NAVMC FORM'
+      'navmc':    'NAVMC FORM',
+      'dodi':     'DODI'
     };
     const typeLabel = typeLabels[item.type] || item.type.toUpperCase();
     const typeBadge = `<span class="type-badge type-${item.type}">${typeLabel}</span>`;

@@ -265,9 +265,14 @@ async function refreshNavmcCache() {
   ];
 
   // Strict filter: formNumber must begin with NAVMC.
+  // Also exclude status==='Canceled' - obsolete entries do not belong in
+  // an active reference list. ~50% of DLA records carry this status.
   const navmcOnly = allRecords.filter(f => {
     const fn = (f?.formNumber || '').toUpperCase().trim();
-    return fn.startsWith('NAVMC');
+    if (!fn.startsWith('NAVMC')) return false;
+    const status = (f?.status || '').toLowerCase();
+    if (status === 'canceled') return false;
+    return true;
   });
 
   // Deduplicate by formNumber. When two records share a formNumber, prefer
@@ -360,6 +365,135 @@ app.get('/api/navmc-forms', async (req, res) => {
     console.error(`[NAVMC] Error: ${error.message}`);
     res.status(error.response?.status || 500).json({
       error: 'Failed to fetch NAVMC forms',
+      message: error.message
+    });
+  }
+});
+
+// DoDI Issuances scraper
+// Source: https://www.esd.whs.mil/Directives/issuances/dodi/
+// Page is a DNN ASP.NET table with all issuances on one page (~1000 rows).
+// Parse with cheerio, cache 1 hour, serve paginated subsets.
+
+const DODI_UPSTREAM_URL = 'https://www.esd.whs.mil/Directives/issuances/dodi/';
+const DODI_BASE_URL = 'https://www.esd.whs.mil';
+const DODI_CACHE_TTL_MS = 60 * 60 * 1000;
+
+let dodiCache = {
+  fetchedAt: 0,
+  items: null,
+  inFlight: null
+};
+
+async function refreshDodiCache() {
+  const t0 = Date.now();
+  console.log('[DODI] Refreshing cache - fetching from esd.whs.mil');
+
+  const response = await axios.get(DODI_UPSTREAM_URL, {
+    httpsAgent,
+    timeout: 60000,
+    headers: {
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+  });
+
+  const $ = cheerio.load(response.data);
+  const items = [];
+
+  // Each issuance row carries class dnnGridItem or dnnGridAltItem.
+  // Cells in order: Issuance #, Issuance Date, Subject, CH #, CH Date,
+  // Related Memo, OPR.
+  $('tr.dnnGridItem, tr.dnnGridAltItem').each((_, row) => {
+    const cells = $(row).find('> td');
+    if (cells.length < 7) return;
+
+    const linkEl = cells.eq(0).find('a').first();
+    const id = (linkEl.text() || cells.eq(0).text() || '').trim().replace(/\s+/g, ' ');
+    if (!id) return;
+
+    let link = (linkEl.attr('href') || '').trim();
+    if (link.startsWith('/')) link = DODI_BASE_URL + link;
+
+    const issuanceDate = cells.eq(1).text().trim();
+    const subject = cells.eq(2).text().trim().replace(/\s+/g, ' ');
+    const chNumber = cells.eq(3).text().trim().replace(/\s+/g, ' ');
+    const chDate = cells.eq(4).text().trim();
+    const relatedMemo = cells.eq(5).text().trim().replace(/\s+/g, ' ');
+    const opr = cells.eq(6).text().trim().replace(/\s+/g, ' ');
+
+    items.push({
+      id,
+      link,
+      issuanceDate,
+      subject,
+      chNumber,
+      chDate,
+      relatedMemo,
+      opr
+    });
+  });
+
+  dodiCache = {
+    fetchedAt: Date.now(),
+    items,
+    inFlight: null
+  };
+
+  console.log(`[DODI] Cache refreshed in ${Date.now() - t0}ms - ${items.length} issuances`);
+  return dodiCache;
+}
+
+async function getDodiCache(forceRefresh) {
+  const fresh = dodiCache.items && (Date.now() - dodiCache.fetchedAt) < DODI_CACHE_TTL_MS;
+  if (fresh && !forceRefresh) return dodiCache;
+  if (dodiCache.inFlight) return dodiCache.inFlight;
+  dodiCache.inFlight = refreshDodiCache().finally(() => {
+    if (dodiCache.inFlight) dodiCache.inFlight = null;
+  });
+  return dodiCache.inFlight;
+}
+
+app.get('/api/dodi', async (req, res) => {
+  const page = parseInt(req.query.page, 10) || 1;
+  const pageSize = Math.min(parseInt(req.query.pageSize, 10) || 100, 2000);
+  const debug = req.query.debug === '1';
+  const forceRefresh = req.query.refresh === '1';
+
+  try {
+    const cache = await getDodiCache(forceRefresh);
+    const items = cache.items || [];
+
+    if (debug) {
+      return res.json({
+        upstream: DODI_UPSTREAM_URL,
+        cacheAgeMs: Date.now() - cache.fetchedAt,
+        cacheTtlMs: DODI_CACHE_TTL_MS,
+        totalCount: items.length,
+        sampleItem: items[0] || null,
+        sampleItem10: items[10] || null,
+        sampleItem100: items[100] || null
+      });
+    }
+
+    const totalCount = items.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const start = (page - 1) * pageSize;
+    const slice = items.slice(start, start + pageSize);
+
+    res.json({
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasNextPage: page < totalPages,
+      cacheAgeMs: Date.now() - cache.fetchedAt,
+      collection: slice
+    });
+  } catch (error) {
+    console.error(`[DODI] Error: ${error.message}`);
+    res.status(error.response?.status || 500).json({
+      error: 'Failed to fetch DoDI issuances',
       message: error.message
     });
   }
