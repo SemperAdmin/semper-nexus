@@ -441,8 +441,12 @@ async function fetchNavmcForms() {
     const data = await response.json();
     const items = Array.isArray(data.collection) ? data.collection : [];
     allNavmcForms = items.map(f => {
-      const pubDate = f.creationDate || new Date().toISOString();
-      const pubDateObj = new Date(pubDate);
+      const rawDate = f.creationDate || new Date().toISOString();
+      const pubDateObj = new Date(rawDate);
+      // Normalize to ISO so the date filter and sort treat all message types
+      // consistently. Fall back to epoch if upstream date does not parse.
+      const pubDate = isNaN(pubDateObj.getTime()) ? new Date(0).toISOString() : pubDateObj.toISOString();
+      const safeDateObj = isNaN(pubDateObj.getTime()) ? new Date(0) : pubDateObj;
       const id = f.formNumber || `Form ${f.id || ''}`;
       const subject = (f.formTitle || '').replace(/<[^>]+>/g, '').trim() || id;
       const status = f.status || '';
@@ -450,6 +454,10 @@ async function fetchNavmcForms() {
       // Prefix Canceled marker in subject for visual distinction in the list.
       // Card renderer reads status field directly for CSS state styling.
       const displaySubject = isCanceled ? `[CANCELED] ${subject}` : subject;
+      const searchText = `${id} ${subject} ${f.sponsor || ''} ${f.command || ''} ${f.stockNumber || ''} ${status}`.toLowerCase();
+      // Pre-tokenize for multi-word search. Filter at app level expects
+      // searchTokens array - omitting it throws on multi-word queries.
+      const searchTokens = searchText.split(/\s+/).filter(token => token.length > 2);
       return {
         id: id,
         numericId: String(f.id || f.stockNumber || id),
@@ -457,14 +465,15 @@ async function fetchNavmcForms() {
         title: id,
         link: f.dsoSearchLink || 'https://dso.dla.mil/DONForms/?search=NAVMC',
         pubDate: pubDate,
-        pubDateObj: pubDateObj,
+        pubDateObj: safeDateObj,
         summary: `${f.sponsor || ''} | ${status}`.trim(),
         description: `Sponsor ${f.sponsor || 'n/a'}. Command ${f.command || 'n/a'}. Stock ${f.stockNumber || 'n/a'}. Status ${status || 'n/a'}.`,
         category: f.formType || '',
         type: 'navmc',
         status: status,
         isCanceled: isCanceled,
-        searchText: `${id} ${subject} ${f.sponsor || ''} ${f.command || ''} ${f.stockNumber || ''} ${status}`.toLowerCase(),
+        searchText: searchText,
+        searchTokens: searchTokens,
         detailsFetched: true,
         maradminNumber: null
       };
@@ -496,12 +505,20 @@ async function fetchDodi() {
     const data = await response.json();
     const items = Array.isArray(data.collection) ? data.collection : [];
     allDodi = items.map(d => {
-      // Issuance Date format from esd.whs.mil is M/D/YYYY. Parse for sort.
-      const pubDate = d.issuanceDate || '';
-      const pubDateObj = pubDate ? new Date(pubDate) : new Date(0);
+      // esd.whs.mil ships M/D/YYYY. Parse, then normalize to ISO so the date
+      // filter and sort match every other message type. Invalid dates fall
+      // back to epoch and sort to the bottom.
+      const rawDate = d.issuanceDate || '';
+      const parsedDate = rawDate ? new Date(rawDate) : new Date(0);
+      const safeDateObj = isNaN(parsedDate.getTime()) ? new Date(0) : parsedDate;
+      const pubDate = safeDateObj.toISOString();
       const id = d.id || '';
       const subject = (d.subject || '').replace(/<[^>]+>/g, '').trim() || id;
       const chSuffix = d.chNumber && d.chDate ? ` (${d.chNumber} ${d.chDate})` : '';
+      const searchText = `${id} ${subject} ${d.opr || ''} ${d.relatedMemo || ''}`.toLowerCase();
+      // Pre-tokenize for multi-word search. filterMessages assumes
+      // searchTokens exists on every message.
+      const searchTokens = searchText.split(/\s+/).filter(token => token.length > 2);
       return {
         id: id,
         numericId: id,
@@ -509,12 +526,13 @@ async function fetchDodi() {
         title: id,
         link: d.link || 'https://www.esd.whs.mil/Directives/issuances/dodi/',
         pubDate: pubDate,
-        pubDateObj: pubDateObj,
+        pubDateObj: safeDateObj,
         summary: `${d.opr || ''}${chSuffix}`.trim(),
         description: `OPR ${d.opr || 'n/a'}. ${d.chNumber ? 'Change ' + d.chNumber + ' on ' + d.chDate + '. ' : ''}${d.relatedMemo ? 'Related memo ' + d.relatedMemo + '.' : ''}`.trim(),
         category: 'DoD Issuance',
         type: 'dodi',
-        searchText: `${id} ${subject} ${d.opr || ''} ${d.relatedMemo || ''}`.toLowerCase(),
+        searchText: searchText,
+        searchTokens: searchTokens,
         detailsFetched: true,
         maradminNumber: null
       };
@@ -1868,15 +1886,15 @@ function updateTabCounters() {
         break;
       case 'dodforms':
         count = getFilteredCount(allDodForms);
-        baseText = 'DD_FORMS';
+        baseText = 'DD FORMS';
         break;
       case 'igmc':
         count = getFilteredCount(allIgmcChecklists);
-        baseText = 'FA_CHECKLISTS';
+        baseText = 'FA CHECKLISTS';
         break;
       case 'navmc':
         count = getFilteredCount(allNavmcForms);
-        baseText = 'NAVMC_FORMS';
+        baseText = 'NAVMC FORMS';
         break;
       case 'secnav':
         count = getFilteredCount(allSecnavs);
@@ -1982,15 +2000,15 @@ function renderSummaryStats() {
         <span class="stat-value">${jtrCount}</span>
       </div>
       <div class="stat-item">
-        <span class="stat-label">FA_CHECKLISTS:</span>
+        <span class="stat-label">FA CHECKLISTS:</span>
         <span class="stat-value">${igmcCount}</span>
       </div>
       <div class="stat-item">
-        <span class="stat-label">NAVMC_FORMS:</span>
+        <span class="stat-label">NAVMC FORMS:</span>
         <span class="stat-value">${navmcCount}</span>
       </div>
       <div class="stat-item">
-        <span class="stat-label">DD_FORMS:</span>
+        <span class="stat-label">DD FORMS:</span>
         <span class="stat-value">${dodFormsCount}</span>
       </div>
     `;
