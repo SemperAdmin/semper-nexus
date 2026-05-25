@@ -426,7 +426,9 @@ async function fetchNavmcForms() {
   }
   console.log('[NAVMC] Fetching NAVMC Forms from proxy...');
   try {
-    const url = `${CUSTOM_PROXY_URL}/api/navmc-forms?page=1&pageSize=100`;
+    // Request the full cached set in one shot. Proxy holds 1215+ deduped
+    // NAVMC-numbered forms in memory and serves them from cache instantly.
+    const url = `${CUSTOM_PROXY_URL}/api/navmc-forms?page=1&pageSize=2000`;
     const response = await fetch(url, { headers: { Accept: 'application/json' } });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -438,19 +440,26 @@ async function fetchNavmcForms() {
       const pubDateObj = new Date(pubDate);
       const id = f.formNumber || `Form ${f.id || ''}`;
       const subject = (f.formTitle || '').replace(/<[^>]+>/g, '').trim() || id;
+      const status = f.status || '';
+      const isCanceled = status.toLowerCase() === 'canceled';
+      // Prefix Canceled marker in subject for visual distinction in the list.
+      // Card renderer reads status field directly for CSS state styling.
+      const displaySubject = isCanceled ? `[CANCELED] ${subject}` : subject;
       return {
         id: id,
         numericId: String(f.id || f.stockNumber || id),
-        subject: subject,
+        subject: displaySubject,
         title: id,
         link: f.dsoSearchLink || 'https://dso.dla.mil/DONForms/?search=NAVMC',
         pubDate: pubDate,
         pubDateObj: pubDateObj,
-        summary: `${f.sponsor || ''} | ${f.status || ''}`.trim(),
-        description: `Sponsor ${f.sponsor || 'n/a'}. Command ${f.command || 'n/a'}. Stock ${f.stockNumber || 'n/a'}.`,
+        summary: `${f.sponsor || ''} | ${status}`.trim(),
+        description: `Sponsor ${f.sponsor || 'n/a'}. Command ${f.command || 'n/a'}. Stock ${f.stockNumber || 'n/a'}. Status ${status || 'n/a'}.`,
         category: f.formType || '',
         type: 'navmc',
-        searchText: `${id} ${subject} ${f.sponsor || ''} ${f.command || ''} ${f.stockNumber || ''}`.toLowerCase(),
+        status: status,
+        isCanceled: isCanceled,
+        searchText: `${id} ${subject} ${f.sponsor || ''} ${f.command || ''} ${f.stockNumber || ''} ${status}`.toLowerCase(),
         detailsFetched: true,
         maradminNumber: null
       };
@@ -991,74 +1000,131 @@ async function fetchDodFmrPage(url) {
 }
 
 // Parse DoD FMR change links from HTML document
+// DoD FMR change page (comptroller.war.gov/FMR/change.aspx) is organized by
+// month/year sections. Each section heading is "Month YYYY" followed by a list
+// of FMR PDF links. Walk the DOM in document order, track the most recent
+// section heading, and assign that date to every link below it as the
+// pubDate fallback when no explicit date is in the link.
 function parseDodFmrLinks(doc, sourceUrl) {
   const messages = [];
+  const seenHrefs = new Set(); // de-dupe (same PDF can appear multiple times)
+  const MONTH_NAMES = { january:0, february:1, march:2, april:3, may:4, june:5, july:6, august:7, september:8, october:9, november:10, december:11 };
+  const SECTION_RE = /^\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\s*$/i;
 
-  // Find all links to PDF files and relevant content
-  const links = doc.querySelectorAll('a[href*=".pdf"], a[href*=".PDF"], a[href*="change"]');
+  // Walk every element. Track current section date as we go.
+  let currentSectionDate = null;
+  const walker = doc.createTreeWalker(doc.body || doc, NodeFilter.SHOW_ELEMENT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
 
-  links.forEach(link => {
-    try {
-      const title = link.textContent.trim();
-      const href = new URL(link.getAttribute('href'), sourceUrl).href;
-
-      if (!title || !href) {return;}
-
-      // Extract FMR change identifier from title or filename
-      // Examples: "FMR Change 123", "Change Notice 456", "Volume 7A, Chapter 8"
-      const changeMatch = title.match(/Change\s+(?:Notice\s+)?(\d+)/i) ||
-                         title.match(/FMR\s+Change\s+(\d+)/i) ||
-                         href.match(/change[_-]?(\d+)/i);
-
-      let id = null;
-      if (changeMatch) {
-        id = `FMR Change ${changeMatch[1]}`;
-      } else {
-        // Try to match volume/chapter patterns
-        const volChapterMatch = title.match(/Volume\s+(\d+[A-Z]?),?\s+Chapter\s+(\d+)/i);
-        if (volChapterMatch) {
-          id = `FMR Vol ${volChapterMatch[1]} Ch ${volChapterMatch[2]}`;
-        } else {
-          // Use first 50 characters of title as ID
-          id = title.substring(0, 50);
+    // 1. Section heading detection. Use textContent of element only when
+    //    the element contains a short string matching "Month YYYY".
+    //    Skip <a> elements (links never become section headers).
+    if (node.tagName !== 'A') {
+      const text = (node.textContent || '').trim();
+      if (text.length < 40) {
+        const m = text.match(SECTION_RE);
+        if (m) {
+          const monthIdx = MONTH_NAMES[m[1].toLowerCase()];
+          const year = parseInt(m[2], 10);
+          if (monthIdx !== undefined && year >= 1990 && year <= 2099) {
+            // Only treat as section header when the element is a leaf or
+            // a header-like tag. This avoids matching a wrapper <div> that
+            // happens to contain only a header child.
+            const isLeaf = node.children.length === 0;
+            const isHeaderLike = /^(H[1-6]|STRONG|B|SPAN|LI|P|BUTTON)$/.test(node.tagName);
+            if (isLeaf || isHeaderLike) {
+              currentSectionDate = new Date(Date.UTC(year, monthIdx, 1));
+            }
+          }
         }
       }
-
-      if (id) {
-        const message = createDodFmrMessage(id, title, href);
-        messages.push(message);
-      }
-    } catch (error) {
-      console.error('Error parsing DoD FMR link:', error);
+      continue;
     }
-  });
+
+    // 2. Link processing. Only PDF/document links count.
+    const hrefAttr = node.getAttribute('href');
+    if (!hrefAttr) {continue;}
+    if (!/\.(pdf|aspx)(\?|#|$)/i.test(hrefAttr) && !/change/i.test(hrefAttr)) {continue;}
+
+    const title = (node.textContent || '').trim();
+    if (!title) {continue;}
+
+    let href;
+    try {
+      href = new URL(hrefAttr, sourceUrl).href;
+    } catch (_) { continue; }
+
+    if (seenHrefs.has(href)) {continue;}
+    seenHrefs.add(href);
+
+    // Build ID
+    let id = null;
+    const changeMatch = title.match(/Change\s+(?:Notice\s+)?(\d+)/i) ||
+                        title.match(/FMR\s+Change\s+(\d+)/i) ||
+                        href.match(/change[_-]?(\d+)/i);
+    if (changeMatch) {
+      id = `FMR Change ${changeMatch[1]}`;
+    } else {
+      const volChapterMatch = title.match(/Volume\s+(\d+[A-Z]?),?\s+Chapter\s+(\d+)/i);
+      if (volChapterMatch) {
+        id = `FMR Vol ${volChapterMatch[1]} Ch ${volChapterMatch[2]}`;
+      } else {
+        id = title.substring(0, 50);
+      }
+    }
+    if (!id) {continue;}
+
+    const message = createDodFmrMessage(id, title, href, currentSectionDate);
+    messages.push(message);
+  }
 
   return messages;
 }
 
-// Helper function to create DoD FMR message object
-function createDodFmrMessage(id, title, href) {
-  // Try to extract date from title or use a very old date as fallback
-  let pubDate = new Date('2000-01-01');
-  let pubDateObj = new Date('2000-01-01');
+// Helper function to create DoD FMR message object.
+// Date resolution priority:
+//   1. Explicit YYYYMMDD in the filename (e.g., VOL_04_CH_24_20260304_...)
+//   2. Explicit date string in the link text (DD Mon YYYY, M/D/YYYY, YYYY-MM-DD)
+//   3. Section month/year from the surrounding "Month YYYY" heading, day=01
+//   4. Final fallback: 2000-01-01
+function createDodFmrMessage(id, title, href, sectionDate) {
+  let pubDateObj = null;
 
-  // Look for date in title (various formats)
-  const dateMatch = title.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i) ||
-                    title.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/) ||
-                    title.match(/(\d{4})-(\d{2})-(\d{2})/);
-
-  if (dateMatch) {
-    try {
-      pubDateObj = new Date(dateMatch[0]);
-      if (!isNaN(pubDateObj.getTime())) {
-        pubDate = pubDateObj.toISOString();
-      }
-    } catch (e) {
-      pubDate = pubDateObj.toISOString();
-    }
-  } else {
-    pubDate = pubDateObj.toISOString();
+  // 1. Filename date (8-digit YYYYMMDD)
+  const filenameMatch = href.match(/(20[0-9]{2})([01][0-9])([0-3][0-9])/);
+  if (filenameMatch) {
+    const y = parseInt(filenameMatch[1], 10);
+    const m = parseInt(filenameMatch[2], 10) - 1;
+    const d = parseInt(filenameMatch[3], 10);
+    const candidate = new Date(Date.UTC(y, m, d));
+    if (!isNaN(candidate.getTime())) {pubDateObj = candidate;}
   }
+
+  // 2. Explicit date in title
+  if (!pubDateObj) {
+    const dateMatch = title.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i) ||
+                      title.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/) ||
+                      title.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (dateMatch) {
+      try {
+        const candidate = new Date(dateMatch[0]);
+        if (!isNaN(candidate.getTime())) {pubDateObj = candidate;}
+      } catch (_) { /* fall through */ }
+    }
+  }
+
+  // 3. Section month/year fallback (1st of that month)
+  if (!pubDateObj && sectionDate instanceof Date && !isNaN(sectionDate.getTime())) {
+    pubDateObj = sectionDate;
+  }
+
+  // 4. Final fallback
+  if (!pubDateObj) {
+    pubDateObj = new Date('2000-01-01');
+  }
+
+  const pubDate = pubDateObj.toISOString();
 
   return {
     id: id,
@@ -2821,9 +2887,22 @@ function showFeedbackStatus(message, type, issueUrl = null) {
   }
 }
 
-// captureUserContext removed. Feedback submissions are now anonymous and
-// inline-construct only the feedbackTab. No browser, IP, viewport, URL,
-// or device identifier is captured. Privacy Act compliance baseline.
+// Capture user context for feedback
+function captureUserContext() {
+  const currentFilter = document.querySelector('.message-type-btn.active');
+  const theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
+
+  return {
+    browser: navigator.userAgent,
+    screenResolution: `${window.screen.width}x${window.screen.height}`,
+    viewport: `${window.innerWidth}x${window.innerHeight}`,
+    currentTab: currentFilter ? currentFilter.dataset.type : 'unknown',
+    dateFilter: currentDateRange,
+    theme: theme,
+    timestamp: new Date().toISOString(),
+    url: window.location.href
+  };
+}
 
 // ============================================================================
 // WEB VITALS TRACKING

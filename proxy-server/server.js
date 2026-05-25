@@ -260,14 +260,38 @@ async function refreshNavmcCache() {
     return fn.startsWith('NAVMC');
   });
 
+  // Deduplicate by formNumber. When two records share a formNumber, prefer
+  // the Active status entry. Tiebreak on newest creationDate. This collapses
+  // the DigitalProduct + WarehouseProduct duplicates DLA indexes separately.
+  const byFormNumber = new Map();
+  for (const rec of navmcOnly) {
+    const key = (rec.formNumber || '').toUpperCase().trim();
+    const existing = byFormNumber.get(key);
+    if (!existing) {
+      byFormNumber.set(key, rec);
+      continue;
+    }
+    const existingActive = existing.status === 'Active';
+    const recActive = rec.status === 'Active';
+    if (recActive && !existingActive) {
+      byFormNumber.set(key, rec);
+    } else if (recActive === existingActive) {
+      // Same status. Keep newer creationDate.
+      const existingDate = new Date(existing.creationDate || 0).getTime();
+      const recDate = new Date(rec.creationDate || 0).getTime();
+      if (recDate > existingDate) byFormNumber.set(key, rec);
+    }
+  }
+  const deduped = Array.from(byFormNumber.values());
+
   navmcCache = {
     fetchedAt: Date.now(),
-    items: navmcOnly,
+    items: deduped,
     totalUpstream: totalCount,
     inFlight: null
   };
 
-  console.log(`[NAVMC] Cache refreshed in ${Date.now() - t0}ms - ${navmcOnly.length} NAVMC-numbered of ${allRecords.length} fetched (${totalCount} reported)`);
+  console.log(`[NAVMC] Cache refreshed in ${Date.now() - t0}ms - ${deduped.length} unique NAVMC-numbered (${navmcOnly.length} pre-dedup) of ${allRecords.length} fetched (${totalCount} reported)`);
   return navmcCache;
 }
 
@@ -286,7 +310,7 @@ async function getNavmcCache(forceRefresh) {
 
 app.get('/api/navmc-forms', async (req, res) => {
   const page = parseInt(req.query.page, 10) || 1;
-  const pageSize = Math.min(parseInt(req.query.pageSize, 10) || 100, 500);
+  const pageSize = Math.min(parseInt(req.query.pageSize, 10) || 100, 2000);
   const debug = req.query.debug === '1';
   const forceRefresh = req.query.refresh === '1';
 
