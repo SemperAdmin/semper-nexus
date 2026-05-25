@@ -487,23 +487,61 @@ async function fetchNavmcForms() {
   }
 }
 
-// Fetch DoD Issuances (DoDI) from the Render proxy, which scrapes
-// https://www.esd.whs.mil/Directives/issuances/dodi/ and parses the DNN
-// table into JSON. Single page upstream, proxy caches for 1 hour.
+// Fetch DoD Issuances (DoDI) directly from esd.whs.mil. Same site as DD
+// Forms and same CORS pattern: try browser fetch first, fall back to
+// proxy. Parse the DNN ASP.NET table client-side with DOMParser, then
+// shape items the same way the proxy used to.
+const DODI_URL = 'https://www.esd.whs.mil/Directives/issuances/dodi/';
+const DODI_BASE_URL = 'https://www.esd.whs.mil';
+
+// Parse the DNN UserDefinedTable that drives the DoDI issuances page.
+// Each issuance row carries class dnnGridItem or dnnGridAltItem.
+// Cells in order: Issuance #, Issuance Date, Subject, CH #, CH Date,
+// Related Memo, OPR.
+function parseDodiTable(doc) {
+  const items = [];
+  const rows = doc.querySelectorAll('tr.dnnGridItem, tr.dnnGridAltItem');
+  rows.forEach(row => {
+    const cells = row.querySelectorAll(':scope > td');
+    if (cells.length < 7) return;
+
+    const linkEl = cells[0].querySelector('a');
+    const id = ((linkEl?.textContent || cells[0].textContent) || '').trim().replace(/\s+/g, ' ');
+    if (!id) return;
+
+    let link = (linkEl?.getAttribute('href') || '').trim();
+    if (link.startsWith('/')) link = DODI_BASE_URL + link;
+
+    items.push({
+      id,
+      link,
+      issuanceDate: cells[1].textContent.trim(),
+      subject: cells[2].textContent.trim().replace(/\s+/g, ' '),
+      chNumber: cells[3].textContent.trim().replace(/\s+/g, ' '),
+      chDate: cells[4].textContent.trim(),
+      relatedMemo: cells[5].textContent.trim().replace(/\s+/g, ' '),
+      opr: cells[6].textContent.trim().replace(/\s+/g, ' ')
+    });
+  });
+  console.log(`[DODI] Parsed ${items.length} rows from DNN table`);
+  return items;
+}
+
 async function fetchDodi() {
-  if (!CUSTOM_PROXY_URL) {
-    console.warn('[DODI] CUSTOM_PROXY_URL not set; skipping DoDI fetch');
-    return;
-  }
-  console.log('[DODI] Fetching DoD Issuances from proxy...');
+  console.log('[DODI] Fetching DoD Issuances from esd.whs.mil...');
   try {
-    const url = `${CUSTOM_PROXY_URL}/api/dodi?page=1&pageSize=2000`;
-    const response = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    let html = await tryDirectFetch(DODI_URL).catch(() => null);
+    if (!html) {
+      console.warn('[DODI] Direct fetch failed, trying proxy fallback');
+      html = await fetchViaCustomProxy(DODI_URL);
     }
-    const data = await response.json();
-    const items = Array.isArray(data.collection) ? data.collection : [];
+    if (!html) {
+      throw new Error('All DoDI fetch attempts failed');
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const items = parseDodiTable(doc);
     allDodi = items.map(d => {
       // esd.whs.mil ships M/D/YYYY. Parse, then normalize to ISO so the date
       // filter and sort match every other message type. Invalid dates fall
