@@ -26,8 +26,18 @@ if (!GITHUB_TOKEN) {
 app.set('trust proxy', true);
 
 // Enable CORS for your GitHub Pages site
+// CORS allowlist. furby203824.github.io is the PoC deploy target.
+// nexus.github.io is reserved for the Semper Admin migration.
+// localhost entries cover local dev with Vite/static servers on common ports.
 app.use(cors({
-  origin: ['https://nexus.github.io', 'http://localhost:8000', 'http://127.0.0.1:8000'],
+  origin: [
+    'https://furby203824.github.io',
+    'https://nexus.github.io',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173'
+  ],
   methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization'],
