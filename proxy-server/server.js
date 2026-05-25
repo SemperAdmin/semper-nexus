@@ -186,72 +186,147 @@ app.get('/api/navy-directives', async (req, res) => {
 // NAVMC Forms via DLA DSO DON Forms API
 // Source SPA: https://dso.dla.mil/DONForms/?search=NAVMC
 // Backend API: https://dso.dla.mil/DONNavyForms-RequestService/api/forms/search
-// Cross-origin not allowed by the upstream (no CORS header), so we proxy and
-// filter server-side to return only NAVMC-numbered forms.
 //
-// Debug mode: append ?debug=1 to return the raw upstream payload (first item
-// plus key inventory) so field names can be verified without redeploying.
+// DLA returns ~1764 records for SearchQuery=NAVMC across all DLA-indexed
+// fields (formNumber, formTitle, command). Most are blank-formNumber or
+// warehouse products with command=NAVMC but non-NAVMC formNumbers. To
+// surface only real NAVMC-numbered Marine Corps forms, this route paginates
+// every page server-side, filters strictly on formNumber prefix, and caches
+// the filtered list in memory with a TTL.
+//
+// Debug mode: append ?debug=1 to return cache metadata + the first item of
+// the filtered list so field shape can be verified without redeploying.
+
+const NAVMC_UPSTREAM_BASE = 'https://dso.dla.mil/DONNavyForms-RequestService/api/forms/search';
+const NAVMC_UPSTREAM_PAGE_SIZE = 100; // DLA caps at 100 per page
+const NAVMC_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+let navmcCache = {
+  fetchedAt: 0,
+  items: null,
+  totalUpstream: 0,
+  inFlight: null
+};
+
+function buildNavmcUpstream(page, pageSize) {
+  return `${NAVMC_UPSTREAM_BASE}?SearchQuery=NAVMC&Page=${page}&PageSize=${pageSize}&SortBy=FormNumber&SortOrder=Ascending`;
+}
+
+async function fetchUpstreamPage(page, pageSize) {
+  const url = buildNavmcUpstream(page, pageSize);
+  const response = await axios.get(url, {
+    httpsAgent,
+    timeout: 30000,
+    headers: {
+      'Accept': 'application/json',
+      'User-Agent': 'Nexus-Proxy/2.0 (PoC; +https://github.com/furby203824/Nexus)'
+    }
+  });
+  return response.data || {};
+}
+
+async function refreshNavmcCache() {
+  // Probe page 1 to discover totalCount, then fetch remaining pages in parallel.
+  // 18 pages × 100 records ≈ 1764 records. Parallel keeps total latency under
+  // a few seconds. DLA returns full payloads, so memory cost is bounded.
+  console.log('[NAVMC] Refreshing cache - fetching all pages from DLA');
+  const t0 = Date.now();
+
+  const first = await fetchUpstreamPage(1, NAVMC_UPSTREAM_PAGE_SIZE);
+  const totalCount = first.totalCount || 0;
+  const totalPages = first.totalPages || 0;
+  const firstCollection = Array.isArray(first.collection) ? first.collection : [];
+
+  const remainingPages = [];
+  for (let p = 2; p <= totalPages; p++) remainingPages.push(p);
+
+  const remainingResults = await Promise.all(
+    remainingPages.map(p => fetchUpstreamPage(p, NAVMC_UPSTREAM_PAGE_SIZE)
+      .catch(err => {
+        console.error(`[NAVMC] Page ${p} failed: ${err.message}`);
+        return { collection: [] };
+      })
+    )
+  );
+
+  const allRecords = [
+    ...firstCollection,
+    ...remainingResults.flatMap(r => Array.isArray(r.collection) ? r.collection : [])
+  ];
+
+  // Strict filter: formNumber must begin with NAVMC.
+  const navmcOnly = allRecords.filter(f => {
+    const fn = (f?.formNumber || '').toUpperCase().trim();
+    return fn.startsWith('NAVMC');
+  });
+
+  navmcCache = {
+    fetchedAt: Date.now(),
+    items: navmcOnly,
+    totalUpstream: totalCount,
+    inFlight: null
+  };
+
+  console.log(`[NAVMC] Cache refreshed in ${Date.now() - t0}ms - ${navmcOnly.length} NAVMC-numbered of ${allRecords.length} fetched (${totalCount} reported)`);
+  return navmcCache;
+}
+
+async function getNavmcCache(forceRefresh) {
+  const fresh = navmcCache.items && (Date.now() - navmcCache.fetchedAt) < NAVMC_CACHE_TTL_MS;
+  if (fresh && !forceRefresh) return navmcCache;
+
+  // Coalesce concurrent refreshes - only one upstream scan at a time.
+  if (navmcCache.inFlight) return navmcCache.inFlight;
+
+  navmcCache.inFlight = refreshNavmcCache().finally(() => {
+    if (navmcCache.inFlight) navmcCache.inFlight = null;
+  });
+  return navmcCache.inFlight;
+}
+
 app.get('/api/navmc-forms', async (req, res) => {
   const page = parseInt(req.query.page, 10) || 1;
-  const pageSize = Math.min(parseInt(req.query.pageSize, 10) || 100, 100);
+  const pageSize = Math.min(parseInt(req.query.pageSize, 10) || 100, 500);
   const debug = req.query.debug === '1';
-  // Sort by FormNumber Ascending so NAVMC-prefixed forms cluster on early
-  // pages. CreationDate Descending surfaces warehouse products tagged with
-  // command=NAVMC but with non-NAVMC form numbers (USSF, JFOL, etc.).
-  const upstream = `https://dso.dla.mil/DONNavyForms-RequestService/api/forms/search?SearchQuery=NAVMC&Page=${page}&PageSize=${pageSize}&SortBy=FormNumber&SortOrder=Ascending`;
+  const forceRefresh = req.query.refresh === '1';
 
   try {
-    const response = await axios.get(upstream, {
-      httpsAgent,
-      timeout: 30000,
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Nexus-Proxy/2.0 (PoC; +https://github.com/furby203824/Nexus)'
-      }
-    });
+    const cache = await getNavmcCache(forceRefresh);
+    const items = cache.items || [];
 
-    const data = response.data || {};
-    const all = Array.isArray(data.collection) ? data.collection : [];
-
-    // Debug short-circuit. Returns full first item + top-level key list so we
-    // can identify the real field name for the NAVMC identifier.
     if (debug) {
-      const sample = all[0] || null;
       return res.json({
-        upstream,
-        upstreamKeys: Object.keys(data),
-        sampleItemKeys: sample ? Object.keys(sample) : [],
-        sampleItem: sample,
-        totalCount: data.totalCount || 0,
-        sourceCount: all.length
+        upstream: buildNavmcUpstream(1, NAVMC_UPSTREAM_PAGE_SIZE),
+        cacheAgeMs: Date.now() - cache.fetchedAt,
+        cacheTtlMs: NAVMC_CACHE_TTL_MS,
+        totalUpstream: cache.totalUpstream,
+        filteredCount: items.length,
+        sampleItemKeys: items[0] ? Object.keys(items[0]) : [],
+        sampleItem: items[0] || null
       });
     }
 
-    // Strict filter: formNumber must begin with NAVMC. The upstream returns
-    // 1764 records tagged command=NAVMC, but most have non-NAVMC formNumbers
-    // (USSF, JFOL warehouse products). Marines expect to see actual
-    // NAVMC-numbered forms in this tab.
-    const navmcOnly = all.filter(f => {
-      const fn = (f?.formNumber || '').toUpperCase().trim();
-      return fn.startsWith('NAVMC');
-    });
+    const totalCount = items.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const start = (page - 1) * pageSize;
+    const slice = items.slice(start, start + pageSize);
 
     res.json({
-      page: data.pageIndex || page,
-      pageSize: data.pageSize || pageSize,
-      totalCount: data.totalCount || 0,
-      totalPages: data.totalPages || 0,
-      hasNextPage: !!data.hasNextPage,
-      sourceCount: all.length,
-      filteredCount: navmcOnly.length,
-      collection: navmcOnly
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasNextPage: page < totalPages,
+      sourceCount: cache.totalUpstream,
+      filteredCount: totalCount,
+      cacheAgeMs: Date.now() - cache.fetchedAt,
+      collection: slice
     });
   } catch (error) {
-    console.error(`Error fetching NAVMC forms: ${error.message}`);
+    console.error(`[NAVMC] Error: ${error.message}`);
     res.status(error.response?.status || 500).json({
       error: 'Failed to fetch NAVMC forms',
-      message: error.message,
-      upstream
+      message: error.message
     });
   }
 });
