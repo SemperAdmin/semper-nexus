@@ -343,6 +343,8 @@ searchInput.addEventListener("input", debounce(filterMessages, 300));
 // dateRangeSelect removed - using quick filter buttons only
 clearSearchBtn.addEventListener("click", clearSearch);
 messageTypeButtons.forEach(btn => {
+  // External link tabs (anchor elements like PAA) handle their own navigation
+  if (btn.tagName === 'A') return;
   btn.addEventListener("click", () => switchMessageType(btn.dataset.type));
 });
 quickFilterButtons.forEach(btn => {
@@ -1955,8 +1957,7 @@ function updateTabCounters() {
       case 'tan':
       case 'fan':
       case 'ican':
-        // Inactive coming-soon placeholders - render label as-is without counter
-        btn.textContent = type.toUpperCase();
+        // External SharePoint links - leave anchor content untouched
         return;
       case 'all':
         // Exclude ALNAV and SECNAV from All Messages count

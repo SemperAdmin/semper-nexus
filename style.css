@@ -2740,6 +2740,30 @@ footer p {
   transform: none;
 }
 
+/* ============================================================================
+   External link tabs (PAA - CAC-protected SharePoint list)
+   Styled as an active, clickable tab with an external indicator.
+   ============================================================================ */
+.message-type-btn--external {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  text-decoration: none;
+  border: 1px dashed var(--color-marine-blue-400, var(--color-border));
+}
+
+.message-type-btn--external:hover,
+.message-type-btn--external:focus-visible {
+  background: var(--color-marine-blue-100, var(--color-surface-2));
+  color: var(--color-marine-blue-700, var(--color-foreground));
+  border-style: solid;
+}
+
+.message-type-btn--external .external-icon {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
 /* NAVMC Form type badge */
 .type-badge.type-navmc {
   background: var(--color-marine-blue-100);

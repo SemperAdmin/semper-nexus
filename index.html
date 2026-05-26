@@ -39,7 +39,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="stylesheet" href="semper-tokens.css?v=3">
-<link rel="stylesheet" href="style.css?v=28">
+<link rel="stylesheet" href="style.css?v=30">
 <link rel="stylesheet" href="ai-improvements.css?v=2">
 <script src="vendor/purify.min.js"></script>
 <script src="lib/safe-html.js?v=1"></script>
@@ -77,11 +77,11 @@
     <button class="message-type-btn" data-type="navmc" role="tab" aria-selected="false" aria-controls="results">NAVMC FORMS <span class="tab-counter" aria-label="0 messages">0</span></button>
     <button class="message-type-btn" data-type="dodi" role="tab" aria-selected="false" aria-controls="results">DODI <span class="tab-counter" aria-label="0 messages">0</span></button>
     <button class="message-type-btn" data-type="dodforms" role="tab" aria-selected="false" aria-controls="results">DD FORMS <span class="tab-counter" aria-label="0 messages">0</span></button>
-    <button class="message-type-btn message-type-btn--inactive" data-type="paa" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Coming soon">PAA</button>
-    <button class="message-type-btn message-type-btn--inactive" data-type="paan" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Coming soon">PAAN</button>
-    <button class="message-type-btn message-type-btn--inactive" data-type="tan" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Coming soon">TAN</button>
-    <button class="message-type-btn message-type-btn--inactive" data-type="fan" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Coming soon">FAN</button>
-    <button class="message-type-btn message-type-btn--inactive" data-type="ican" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Coming soon">ICAN</button>
+    <a class="message-type-btn message-type-btn--external" data-type="paa" href="https://usmc.sharepoint-mil.us.mcas-gov.us/sites/dcmra_mra_mi_missa/Lists/PAA/PAA%20Gallery.aspx?viewid=b5df248c%2Dbbad%2D466e%2D987c%2D50e685dc0547" target="_blank" rel="noopener noreferrer" title="Opens the PAA list on SharePoint in a new tab. CAC sign-in required.">PAA <span class="external-icon" aria-hidden="true">&#8599;</span><span class="sr-only"> (opens external SharePoint site in new tab, CAC required)</span></a>
+    <a class="message-type-btn message-type-btn--external" data-type="paan" href="https://usmc.sharepoint-mil.us.mcas-gov.us/sites/DCPR_RFF_External/Finance_Policy/SitePages/Advisory%20Notifications.aspx" target="_blank" rel="noopener noreferrer" title="Opens Advisory Notifications on SharePoint in a new tab. CAC sign-in required.">PAAN <span class="external-icon" aria-hidden="true">&#8599;</span><span class="sr-only"> (opens external SharePoint site in new tab, CAC required)</span></a>
+    <a class="message-type-btn message-type-btn--external" data-type="tan" href="https://usmc.sharepoint-mil.us.mcas-gov.us/sites/DCPR_RFF_External/Finance_Policy/SitePages/Advisory%20Notifications.aspx" target="_blank" rel="noopener noreferrer" title="Opens Advisory Notifications on SharePoint in a new tab. CAC sign-in required.">TAN <span class="external-icon" aria-hidden="true">&#8599;</span><span class="sr-only"> (opens external SharePoint site in new tab, CAC required)</span></a>
+    <a class="message-type-btn message-type-btn--external" data-type="fan" href="https://usmc.sharepoint-mil.us.mcas-gov.us/sites/DCPR_RFF_External/Finance_Policy/SitePages/Advisory%20Notifications.aspx" target="_blank" rel="noopener noreferrer" title="Opens Advisory Notifications on SharePoint in a new tab. CAC sign-in required.">FAN <span class="external-icon" aria-hidden="true">&#8599;</span><span class="sr-only"> (opens external SharePoint site in new tab, CAC required)</span></a>
+    <a class="message-type-btn message-type-btn--external" data-type="ican" href="https://usmc.sharepoint-mil.us.mcas-gov.us/sites/DCPR_RFF_External/Finance_Policy/SitePages/Advisory%20Notifications.aspx" target="_blank" rel="noopener noreferrer" title="Opens Advisory Notifications on SharePoint in a new tab. CAC sign-in required.">ICAN <span class="external-icon" aria-hidden="true">&#8599;</span><span class="sr-only"> (opens external SharePoint site in new tab, CAC required)</span></a>
     <button class="message-type-btn all-messages-btn" data-type="all" role="tab" aria-selected="false" aria-controls="results">All Messages <span class="tab-counter" aria-label="0 messages">0</span></button>
   </div>
   <div class="filters-section">
@@ -164,7 +164,7 @@
 
 <script src="vendor/web-vitals.iife.js"></script>
 
-<script src="app.js?v=31"></script>
+<script src="app.js?v=33"></script>
 
 <!-- Service Worker Registration for PWA -->
 <script src="pwa-init.js"></script>
