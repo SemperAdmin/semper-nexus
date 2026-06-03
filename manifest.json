@@ -19,5 +19,7 @@
   "categories": ["productivity", "reference", "utilities"],
   "lang": "en-US",
   "dir": "ltr",
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "privacy_policy_url": "PRIVACY_POLICY.md",
+  "terms_of_service_url": "TERMS_OF_SERVICE.md"
 }

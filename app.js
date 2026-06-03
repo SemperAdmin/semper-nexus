@@ -2883,155 +2883,7 @@ function showKeyboardShortcuts() {
   document.getElementById('closeHelpModal').focus();
 }
 
-// ====================================
-// FEEDBACK WIDGET
-// ====================================
-
-// Get feedback widget elements
-const feedbackBtn = document.getElementById('feedbackBtn');
-const feedbackModal = document.getElementById('feedbackModal');
-const closeFeedbackModal = document.getElementById('closeFeedbackModal');
-const cancelFeedback = document.getElementById('cancelFeedback');
-const feedbackForm = document.getElementById('feedbackForm');
-const feedbackStatus = document.getElementById('feedbackStatus');
-
-// Open feedback link
-feedbackBtn.addEventListener('click', () => {
-  window.open('https://nexus.github.io/Sentinel/#detail/semper-nexus/todo', '_blank');
-});
-
-// Close feedback modal
-function closeFeedbackModalFunc() {
-  feedbackModal.classList.add('hidden');
-  document.body.style.overflow = ''; // Restore scrolling
-  feedbackForm.reset();
-  feedbackStatus.classList.add('hidden');
-  feedbackStatus.classList.remove('success', 'error');
-}
-
-closeFeedbackModal.addEventListener('click', closeFeedbackModalFunc);
-cancelFeedback.addEventListener('click', closeFeedbackModalFunc);
-
-// Close modal when clicking outside
-feedbackModal.addEventListener('click', (e) => {
-  if (e.target === feedbackModal) {
-    closeFeedbackModalFunc();
-  }
-});
-
-// Close modal with Escape key
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !feedbackModal.classList.contains('hidden')) {
-    closeFeedbackModalFunc();
-  }
-});
-
-// Handle feedback form submission
-feedbackForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const submitButton = feedbackForm.querySelector('button[type="submit"]');
-  const originalButtonText = submitButton.textContent;
-
-  // Get form values
-  const feedbackType = document.getElementById('feedbackType').value;
-  const feedbackTitle = document.getElementById('feedbackTitle').value;
-  const feedbackDescription = document.getElementById('feedbackDescription').value;
-
-  // Validate
-  if (!feedbackType || !feedbackTitle.trim() || !feedbackDescription.trim()) {
-    showFeedbackStatus('Please fill in all required fields.', 'error');
-    return;
-  }
-
-  // Capture non-identifying context only (no IP, UA, URL, viewport)
-  const context = {
-    feedbackTab: currentMessageType,
-    timestamp: new Date().toISOString()
-  };
-
-  // Disable submit button
-  submitButton.disabled = true;
-  submitButton.textContent = 'Submitting...';
-  feedbackStatus.classList.add('hidden');
-
-  try {
-    // Anonymous submission. No email, no user agent, no URL.
-    const response = await fetch(`${CUSTOM_PROXY_URL}/api/feedback`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        type: feedbackType,
-        title: feedbackTitle,
-        description: feedbackDescription,
-        context: context
-      })
-    });
-
-    const data = await response.json();
-
-    if (response.ok && data.success) {
-      showFeedbackStatus('Thank you! Your feedback has been submitted.', 'success', data.issueUrl);
-
-      // Reset form after 2 seconds
-      setTimeout(() => {
-        closeFeedbackModalFunc();
-      }, 3000);
-    } else {
-      throw new Error(data.error || 'Failed to submit feedback');
-    }
-  } catch (error) {
-    console.error('Feedback submission error:', error);
-    showFeedbackStatus(`Error submitting feedback: ${error.message}. Please try again or report this issue on GitHub.`, 'error');
-  } finally {
-    // Re-enable submit button
-    submitButton.disabled = false;
-    submitButton.textContent = originalButtonText;
-  }
-});
-
-// Show feedback status message (XSS-safe implementation)
-function showFeedbackStatus(message, type, issueUrl = null) {
-  // Clear previous content safely
-  feedbackStatus.textContent = '';
-  feedbackStatus.classList.remove('hidden', 'success', 'error');
-  feedbackStatus.classList.add(type);
-
-  // Add text content safely
-  const textNode = document.createTextNode(message);
-  feedbackStatus.appendChild(textNode);
-
-  // If there's an issue URL, add it as a proper link element
-  if (issueUrl) {
-    feedbackStatus.appendChild(document.createTextNode(' '));
-    const link = document.createElement('a');
-    link.href = issueUrl;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer'; // Security best practice
-    link.style.cssText = 'color: inherit; text-decoration: underline;';
-    link.textContent = 'View issue';
-    feedbackStatus.appendChild(link);
-  }
-}
-
-// Capture user context for feedback
-function captureUserContext() {
-  const currentFilter = document.querySelector('.message-type-btn.active');
-  const theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
-
-  return {
-    browser: navigator.userAgent,
-    screenResolution: `${window.screen.width}x${window.screen.height}`,
-    viewport: `${window.innerWidth}x${window.innerHeight}`,
-    currentTab: currentFilter ? currentFilter.dataset.type : 'unknown',
-    dateFilter: currentDateRange,
-    theme: theme,
-    timestamp: new Date().toISOString(),
-    url: window.location.href
-  };
-}
+// Feedback widget removed for compliance - see PRIVACY_POLICY.md and TERMS_OF_SERVICE.md
 
 // ============================================================================
 // WEB VITALS TRACKING
@@ -3108,4 +2960,148 @@ if (document.readyState === 'complete') {
   initWebVitals();
 } else {
   window.addEventListener('load', initWebVitals);
+}
+
+// Initialize legal modal functionality
+function initLegalModal() {
+  const privacyBtn = document.getElementById('privacyPolicyBtn');
+  const termsBtn = document.getElementById('termsOfServiceBtn');
+  const modal = document.getElementById('legalModal');
+  const closeBtn = document.getElementById('closeLegalModal');
+  const modalBody = document.getElementById('legalModalBody');
+  const modalTitle = document.getElementById('legalModalTitle');
+
+  if (!privacyBtn || !termsBtn || !modal) {
+    console.warn('[Legal Modal] Required elements not found');
+    return;
+  }
+
+  /**
+   * Convert markdown to HTML
+   */
+  function markdownToHtml(markdown) {
+    let html = markdown;
+
+    // Remove horizontal dividers (---)
+    html = html.replace(/^---\n/gm, '');
+    html = html.replace(/\n---$/gm, '');
+
+    // Headers (must be before bold replacement)
+    html = html.replace(/^### (.*?)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.*?)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.*?)$/gm, '<h1>$1</h1>');
+
+    // Bold
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // Links
+    html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    // Tables - convert markdown tables to HTML tables
+    html = html.replace(/\|(.+)\n\|[-\s|]+\n((?:\|.+\n?)*)/g, function(match, header, rows) {
+      const headerCells = header.split('|').map(h => h.trim()).filter(h => h);
+      const headerHtml = '<thead><tr>' + headerCells.map(h => '<th>' + h + '</th>').join('') + '</tr></thead>';
+
+      const rowArray = rows.trim().split('\n').filter(r => r.trim());
+      const bodyHtml = '<tbody>' + rowArray.map(row => {
+        const cells = row.split('|').map(c => c.trim()).filter(c => c);
+        return '<tr>' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>';
+      }).join('') + '</tbody>';
+
+      return '<table>' + headerHtml + bodyHtml + '</table>';
+    });
+
+    // Unordered lists - wrap consecutive list items
+    html = html.replace(/^\* (.*?)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*?<\/li>)/s, function(match) {
+      // Only wrap if not already in a list
+      if (!match.includes('<ul>') && !match.includes('<ol>')) {
+        return '<ul>' + match + '</ul>';
+      }
+      return match;
+    });
+    html = html.replace(/<\/li>\n<\/ul>\n<ul>/g, '</li>');
+
+    // Ordered lists
+    html = html.replace(/^\d+\. (.*?)$/gm, '<li>$1</li>');
+
+    // Paragraphs - split by double newlines and wrap
+    const blocks = html.split(/\n\n+/);
+    html = blocks.map(block => {
+      block = block.trim();
+      if (!block) return '';
+      // Don't wrap headers, lists, tables, or already wrapped content
+      if (block.match(/^<[hlpuiot]/)) {
+        return block;
+      }
+      return '<p>' + block + '</p>';
+    }).filter(b => b).join('\n\n');
+
+    return html;
+  }
+
+  /**
+   * Load and display a legal document
+   */
+  async function loadLegalDocument(filename, title) {
+    try {
+      const response = await fetch('./' + filename);
+      if (!response.ok) throw new Error(`Failed to load ${filename}`);
+
+      const markdown = await response.text();
+      const htmlContent = markdownToHtml(markdown);
+
+      modalTitle.textContent = title === 'Privacy Policy' ? 'Privacy Policy' : 'Terms of Service';
+      modalBody.innerHTML = htmlContent;
+      modal.classList.remove('hidden');
+      modal.focus();
+
+      console.log(`[Legal Modal] Loaded ${title}`);
+    } catch (error) {
+      console.error(`[Legal Modal] Error loading ${filename}:`, error);
+      modalBody.innerHTML = `<p style="color: #cc0000;">Error loading document. Please try again.</p>`;
+      modal.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * Close the modal
+   */
+  function closeModal() {
+    modal.classList.add('hidden');
+  }
+
+  // Event listeners
+  privacyBtn.addEventListener('click', () => {
+    loadLegalDocument('PRIVACY_POLICY.md', 'Privacy Policy');
+  });
+
+  termsBtn.addEventListener('click', () => {
+    loadLegalDocument('TERMS_OF_SERVICE.md', 'Terms of Service');
+  });
+
+  closeBtn.addEventListener('click', closeModal);
+
+  // Close on escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+      closeModal();
+    }
+  });
+
+  // Close on background click (click outside modal content)
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      closeModal();
+    }
+  });
+
+  console.log('[Legal Modal] Initialized');
+}
+
+// Initialize legal modal when DOM is ready
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  initLegalModal();
+} else {
+  document.addEventListener('DOMContentLoaded', initLegalModal);
 }
