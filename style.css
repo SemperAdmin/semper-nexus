@@ -3129,4 +3129,36 @@ textarea:focus-visible,
    ------------------------------------------------------------------------ */
 .feedback-form-group [aria-invalid="true"] {
   border-color: var(--color-destructive);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--col
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-destructive) 25%, transparent);
+}
+
+/* Header feedback link — anchor styled to match .controls buttons */
+.control-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-button);
+  background: color-mix(in srgb, var(--color-parchment) 18%, transparent);
+  color: var(--color-parchment);
+  border: 1px solid color-mix(in srgb, var(--color-parchment) 24%, transparent);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out),
+              transform var(--motion-fast) var(--ease-out);
+}
+
+.control-link:hover {
+  background: color-mix(in srgb, var(--color-usmc-scarlet) 30%, transparent);
+  border-color: var(--color-usmc-scarlet-300);
+  transform: translateY(-1px);
+  color: var(--color-parchment);
+}
+
+.control-link:active {
+  transform: translateY(0);
+}
