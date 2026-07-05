@@ -517,8 +517,25 @@ app.get('/api/proxy', async (req, res) => {
     'travel.dod.mil'      // DoD JTR (Joint Travel Regulations)
   ];
 
-  const urlObj = new URL(targetUrl);
-  const isAllowed = allowedDomains.some(domain => urlObj.hostname.endsWith(domain));
+  let urlObj;
+  try {
+    urlObj = new URL(targetUrl);
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid url parameter' });
+  }
+
+  // Only proxy https targets.
+  if (urlObj.protocol !== 'https:') {
+    return res.status(400).json({ error: 'Only https targets are allowed' });
+  }
+
+  // Exact host or true dot-boundary subdomain match. A bare endsWith() would
+  // treat any hostname ending in the allowlisted string as allowed, so a
+  // commercial suffix like "rss.app" would match an attacker-registered
+  // "myrss.app" and turn this route into an open relay.
+  const isAllowed = allowedDomains.some(domain =>
+    urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain)
+  );
 
   if (!isAllowed) {
     return res.status(403).json({

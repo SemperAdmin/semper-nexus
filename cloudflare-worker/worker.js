@@ -138,9 +138,26 @@ async function handleRequest(request) {
     }
 
     // Security: Check if domain is allowed
-    const targetUrlObj = new URL(targetUrl);
-    const isAllowed = ALLOWED_DOMAINS.some(domain =>
-      targetUrlObj.hostname.endsWith(domain)
+    let targetUrlObj;
+    try {
+      targetUrlObj = new URL(targetUrl);
+    } catch (e) {
+      return new Response(JSON.stringify({
+        error: 'Invalid url parameter'
+      }), {
+        status: 400,
+        headers: {
+          ...corsHeaders(origin),
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
+    // Exact host or true dot-boundary subdomain match only. A bare endsWith()
+    // would let an attacker-registered hostname ending in an allowlisted string
+    // (e.g. a commercial "*.app" suffix) pass and turn this into an open relay.
+    const isAllowed = targetUrlObj.protocol === 'https:' && ALLOWED_DOMAINS.some(domain =>
+      targetUrlObj.hostname === domain || targetUrlObj.hostname.endsWith('.' + domain)
     );
 
     if (!isAllowed) {
