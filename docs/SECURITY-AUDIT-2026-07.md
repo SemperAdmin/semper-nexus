@@ -105,8 +105,8 @@ raw HTML, and `app.js` treats it as sanitized.
 **Attack scenario (VERIFIED — code path confirmed):** DOMPurify asset fails to
 load in production → all rendered feed content bypasses sanitization → a
 tampering proxy's payload reaches `innerHTML` unfiltered. Currently the CSP
-(finding 4) blocks execution, so this is a **latent** XSS gated on one other
-control, not live XSS.
+(see "What is already done well") blocks execution, so this is a **latent** XSS
+gated on one other control, not live XSS.
 
 **Fix** — a security control must fail closed:
 

@@ -524,9 +524,10 @@ app.get('/api/proxy', async (req, res) => {
     return res.status(400).json({ error: 'Invalid url parameter' });
   }
 
-  // Only proxy https targets.
-  if (urlObj.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only https targets are allowed' });
+  // Only proxy https targets on the standard port. A non-default port would let
+  // the allowlisted hosts be used for internal port scanning / service probing.
+  if (urlObj.protocol !== 'https:' || urlObj.port !== '') {
+    return res.status(400).json({ error: 'Only https targets on the standard port are allowed' });
   }
 
   // Exact host or true dot-boundary subdomain match. A bare endsWith() would

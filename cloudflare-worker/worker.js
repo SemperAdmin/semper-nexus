@@ -156,7 +156,7 @@ async function handleRequest(request) {
     // Exact host or true dot-boundary subdomain match only. A bare endsWith()
     // would let an attacker-registered hostname ending in an allowlisted string
     // (e.g. a commercial "*.app" suffix) pass and turn this into an open relay.
-    const isAllowed = targetUrlObj.protocol === 'https:' && ALLOWED_DOMAINS.some(domain =>
+    const isAllowed = targetUrlObj.protocol === 'https:' && targetUrlObj.port === '' && ALLOWED_DOMAINS.some(domain =>
       targetUrlObj.hostname === domain || targetUrlObj.hostname.endsWith('.' + domain)
     );
 
