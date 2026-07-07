@@ -33,6 +33,7 @@ app.use(cors({
   origin: [
     'https://furby203824.github.io',
     'https://nexus.github.io',
+    'https://nexus.app.cloud.gov',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
     'http://localhost:5173',

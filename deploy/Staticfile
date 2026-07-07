@@ -1,0 +1,2 @@
+# Staticfile for the staticfile buildpack.
+# Export uses trailingSlash, so every route is a folder with index.html.
