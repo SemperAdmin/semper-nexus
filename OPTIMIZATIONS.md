@@ -122,7 +122,7 @@ Added comprehensive CSP meta tag to restrict resource loading and execution.
 - www.esd.whs.mil
 - comptroller.war.gov
 - www.travel.dod.mil
-- semper-nexus-proxy.onrender.com
+- usmc-directives-proxy.onrender.com
 - localhost:3000 (development)
 - All CORS proxy domains
 ```
@@ -219,7 +219,7 @@ GitHub Actions workflow that pings the server every 14 minutes to keep it alive.
 
 **Action:**
 ```bash
-curl https://semper-nexus-proxy.onrender.com/health
+curl https://usmc-directives-proxy.onrender.com/health
 ```
 
 **Cost:** Free (GitHub Actions provides 2,000 minutes/month for free)

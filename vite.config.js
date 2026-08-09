@@ -13,9 +13,15 @@ export default defineConfig({
         { src: 'pwa-init.js', dest: '' },
         { src: 'service-worker.js', dest: '' },
         { src: 'semper-tokens.css', dest: '' },
-        // Self-hosted web-vitals (Phase 1.3b - replaces unpkg CDN)
+        // Self-hosted web-vitals and DOMPurify, sourced from node_modules so
+        // package-lock.json stays the single source of truth. Copying from a
+        // committed vendor/ directory instead would silently pin production to
+        // a stale DOMPurify: a Dependabot security bump lands in node_modules
+        // and never reaches the build.
+        // Every deploy target must serve the build output, never the repo root.
+        // safe-html.js fails closed when vendor/purify.min.js 404s, which
+        // blanks every card and stat box.
         { src: 'node_modules/web-vitals/dist/web-vitals.iife.js', dest: 'vendor' },
-        // Self-hosted DOMPurify (Phase 5.1 - innerHTML sanitization)
         { src: 'node_modules/dompurify/dist/purify.min.js', dest: 'vendor' },
         // Self-hosted fontsource fonts (Phase 1.3c - replaces jsdelivr CDN)
         { src: 'node_modules/@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff2', dest: 'fonts' },

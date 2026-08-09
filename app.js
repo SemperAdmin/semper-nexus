@@ -198,7 +198,7 @@ const DOD_FORMS_URLS = [
 // Leave empty to use fallback CORS proxies (unreliable)
 // Prefer local proxy during development; fall back to deployed URL otherwise
 const CUSTOM_PROXY_URL = (() => {
-  const deployed = "https://semper-nexus-proxy.onrender.com";
+  const deployed = "https://usmc-directives-proxy.onrender.com";
   const local = "http://localhost:3000";
   try {
     if (typeof window !== 'undefined') {
@@ -236,6 +236,36 @@ const searchInput = document.getElementById("searchInput");
 // Date range is now controlled by buttons only (dropdown removed)
 const DEFAULT_DATE_RANGE = 7; // "This Week"
 let currentDateRange = DEFAULT_DATE_RANGE;
+
+// Reference catalogs, not dated message traffic. NAVMC forms span decades:
+// 703 of 824 are older than a year and exactly 1 falls inside a 7-day window,
+// so the default range hid the entire catalog behind a "Showing 1 of 824".
+const DATE_FILTER_EXEMPT_TYPES = new Set(['navmc', 'dodforms', 'dodi', 'igmc']);
+
+// True once the user clicks a range button in this session. A restored
+// localStorage preference does not count, since handleDateRangeChange writes
+// that key on every programmatic update and would make every later session
+// look like a deliberate choice.
+let dateRangeExplicit = false;
+
+// Range actually applied to a given message type.
+function effectiveDateRange(type) {
+  if (!dateRangeExplicit && DATE_FILTER_EXEMPT_TYPES.has(type)) {
+    return 0; // All
+  }
+  return currentDateRange;
+}
+
+// Keep the range buttons honest about the range in force. Without this, an
+// exempt tab shows 824 results while "This Week" stays highlighted.
+function syncDateRangeButtons() {
+  const active = effectiveDateRange(currentMessageType);
+  quickFilterButtons.forEach(btn => {
+    const isActive = parseInt(btn.dataset.days) === active;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive);
+  });
+}
 const clearSearchBtn = document.getElementById("clearSearch");
 const messageTypeButtons = document.querySelectorAll(".message-type-btn");
 const quickFilterButtons = document.querySelectorAll(".quick-filter-btn");
@@ -295,6 +325,10 @@ let allSecnavs = []; // Store all SECNAV directives
 let allJtrs = []; // Store all JTR (Joint Travel Regulations) updates
 let allDodFmr = []; // Store all DoD FMR changes
 let allDodi = []; // DoD Issuances (DoDI scraped from esd.whs.mil)
+let allNavmcRaw = []; // Raw DLA DSO records backing allNavmcForms (cached verbatim)
+// Per-feed load failures, keyed by message type. Drives a visible empty state
+// so a blocked fetch reads as an error instead of an empty result set.
+const feedLoadErrors = {};
 let currentMessageType = 'maradmin'; // Track current view: 'maradmin', 'mcpub', 'alnav', 'almar', 'dodforms', 'igmc', 'secnav', 'jtr', 'dodfmr', 'dodi', or 'all'
 
 // Init
@@ -396,26 +430,32 @@ async function fetchAllFeeds() {
   showSkeletonLoaders();
   errorDiv.classList.add("hidden");
 
-  // Fetch all feed types
-  await fetchFeed('maradmin', RSS_FEEDS.maradmin);
-  await fetchFeed('mcpub', RSS_FEEDS.mcpub);
-  // ALNAV uses static data file (Semper Gumby mode - awaiting RSS feed)
-  // await fetchAlnavMessages(); // Disabled - using lib/alnav-data.js instead
-  await fetchFeed('almar', RSS_FEEDS.almar);
-  await fetchFeed('secnav', RSS_FEEDS.secnav); // Fetch SECNAV from RSS feed
-  await fetchFeed('jtr', RSS_FEEDS.jtr); // Fetch JTR (Joint Travel Regulations) updates
+  // Fetch every feed concurrently. The prior sequential await chain ran NAVMC
+  // ninth, behind six RSS fetches with 3 retries at 15s each, so a cold proxy
+  // starved the last feeds in the chain. Each fetcher writes its own array and
+  // handles its own errors, so concurrency introduces no shared-state races.
+  // ALNAV uses static data file (Semper Gumby mode - awaiting RSS feed).
+  const feedTasks = [
+    ['maradmin', () => fetchFeed('maradmin', RSS_FEEDS.maradmin)],
+    ['mcpub', () => fetchFeed('mcpub', RSS_FEEDS.mcpub)],
+    ['almar', () => fetchFeed('almar', RSS_FEEDS.almar)],
+    ['secnav', () => fetchFeed('secnav', RSS_FEEDS.secnav)],
+    ['jtr', () => fetchFeed('jtr', RSS_FEEDS.jtr)],
+    ['dodforms', () => fetchDodForms()],
+    ['dodfmr', () => fetchDodFmrChanges()],
+    ['navmc', () => fetchNavmcForms()],
+    ['dodi', () => fetchDodi()]
+  ];
 
-  // Fetch DoD Forms
-  await fetchDodForms();
-
-  // Fetch DoD FMR changes
-  await fetchDodFmrChanges();
-
-  // Fetch NAVMC Forms via DLA DSO API
-  await fetchNavmcForms();
-
-  // Fetch DoD Issuances (DoDI) via Render proxy (scrapes esd.whs.mil)
-  await fetchDodi();
+  const results = await Promise.allSettled(feedTasks.map(([, run]) => run()));
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      const type = feedTasks[index][0];
+      const message = (result.reason && result.reason.message) || String(result.reason);
+      console.error(`[Feeds] ${type} rejected: ${message}`);
+      feedLoadErrors[type] = message;
+    }
+  });
 
   // Update display
   filterMessages();
@@ -442,51 +482,65 @@ async function fetchNavmcForms() {
     }
     const data = await response.json();
     const items = Array.isArray(data.collection) ? data.collection : [];
-    allNavmcForms = items.map(f => {
-      const rawDate = f.creationDate || new Date().toISOString();
-      const pubDateObj = new Date(rawDate);
-      // Normalize to ISO so the date filter and sort treat all message types
-      // consistently. Fall back to epoch if upstream date does not parse.
-      const pubDate = isNaN(pubDateObj.getTime()) ? new Date(0).toISOString() : pubDateObj.toISOString();
-      const safeDateObj = isNaN(pubDateObj.getTime()) ? new Date(0) : pubDateObj;
-      const id = f.formNumber || `Form ${f.id || ''}`;
-      const subject = (f.formTitle || '').replace(/<[^>]+>/g, '').trim() || id;
-      const status = f.status || '';
-      const isCanceled = status.toLowerCase() === 'canceled';
-      // Prefix Canceled marker in subject for visual distinction in the list.
-      // Card renderer reads status field directly for CSS state styling.
-      const displaySubject = isCanceled ? `[CANCELED] ${subject}` : subject;
-      const searchText = `${id} ${subject} ${f.sponsor || ''} ${f.command || ''} ${f.stockNumber || ''} ${status}`.toLowerCase();
-      // Pre-tokenize for multi-word search. Filter at app level expects
-      // searchTokens array - omitting it throws on multi-word queries.
-      const searchTokens = searchText.split(/\s+/).filter(token => token.length > 2);
-      return {
-        id: id,
-        numericId: String(f.id || f.stockNumber || id),
-        subject: displaySubject,
-        title: id,
-        link: f.dsoSearchLink || 'https://dso.dla.mil/DONForms/?search=NAVMC',
-        pubDate: pubDate,
-        pubDateObj: safeDateObj,
-        summary: `${f.sponsor || ''} | ${status}`.trim(),
-        description: `Sponsor ${f.sponsor || 'n/a'}. Command ${f.command || 'n/a'}. Stock ${f.stockNumber || 'n/a'}. Status ${status || 'n/a'}.`,
-        category: f.formType || '',
-        type: 'navmc',
-        status: status,
-        isCanceled: isCanceled,
-        searchText: searchText,
-        searchTokens: searchTokens,
-        detailsFetched: true,
-        maradminNumber: null
-      };
-    });
+    allNavmcRaw = items;
+    allNavmcForms = items.map(mapNavmcRecord);
     allNavmcForms.sort((a, b) => b.pubDateObj - a.pubDateObj);
+    delete feedLoadErrors.navmc;
     console.log(`[NAVMC] Loaded ${allNavmcForms.length} NAVMC Forms (filtered from ${data.sourceCount || 0}, ${data.totalCount || 0} total available)`);
     cacheData();
   } catch (error) {
     ErrorAnalytics.track('fetchNavmcForms', error, { source: 'DLA DSO via proxy' });
     console.error('[NAVMC] Failed:', error.message);
+    // A CORS block surfaces here as "Failed to fetch" with no status code.
+    // Record it so the NAVMC tab renders a diagnosable message.
+    feedLoadErrors.navmc = error.message || 'Unknown error';
   }
+}
+
+// Map one DLA DSO record to the app's internal message shape.
+// Module scope so cache hydration reuses the identical mapping instead of
+// storing derived fields (searchTokens alone roughly triples cache size).
+function mapNavmcRecord(f) {
+  // Missing creationDate previously fell back to the current timestamp, which
+  // stamped undated forms with today's date and pinned them to the top of the
+  // newest-first sort permanently. Fall back to lastRevisionDate, then to
+  // epoch, matching how fetchDodi treats unparseable dates.
+  const rawDate = f.creationDate || f.lastRevisionDate || '';
+  const parsedDate = rawDate ? new Date(rawDate) : new Date(0);
+  const safeDateObj = isNaN(parsedDate.getTime()) ? new Date(0) : parsedDate;
+  // Normalize to ISO so the date filter and sort treat all message types
+  // consistently.
+  const pubDate = safeDateObj.toISOString();
+  const id = f.formNumber || `Form ${f.id || ''}`;
+  const subject = (f.formTitle || '').replace(/<[^>]+>/g, '').trim() || id;
+  const status = f.status || '';
+  const isCanceled = status.toLowerCase() === 'canceled';
+  // Prefix Canceled marker in subject for visual distinction in the list.
+  // Card renderer reads status field directly for CSS state styling.
+  const displaySubject = isCanceled ? `[CANCELED] ${subject}` : subject;
+  const searchText = `${id} ${subject} ${f.sponsor || ''} ${f.command || ''} ${f.stockNumber || ''} ${status}`.toLowerCase();
+  // Pre-tokenize for multi-word search. Filter at app level expects
+  // searchTokens array - omitting it throws on multi-word queries.
+  const searchTokens = searchText.split(/\s+/).filter(token => token.length > 2);
+  return {
+    id: id,
+    numericId: String(f.id || f.stockNumber || id),
+    subject: displaySubject,
+    title: id,
+    link: f.dsoSearchLink || 'https://dso.dla.mil/DONForms/?search=NAVMC',
+    pubDate: pubDate,
+    pubDateObj: safeDateObj,
+    summary: `${f.sponsor || ''} | ${status}`.trim(),
+    description: `Sponsor ${f.sponsor || 'n/a'}. Command ${f.command || 'n/a'}. Stock ${f.stockNumber || 'n/a'}. Status ${status || 'n/a'}.`,
+    category: f.formType || '',
+    type: 'navmc',
+    status: status,
+    isCanceled: isCanceled,
+    searchText: searchText,
+    searchTokens: searchTokens,
+    detailsFetched: true,
+    maradminNumber: null
+  };
 }
 
 // Fetch DoD Issuances (DoDI) directly from esd.whs.mil. Same site as DD
@@ -583,11 +637,13 @@ async function fetchDodi() {
       if (!isNaN(diff) && diff !== 0) return diff;
       return a.id.localeCompare(b.id);
     });
+    delete feedLoadErrors.dodi;
     console.log(`[DODI] Loaded ${allDodi.length} DoD Issuances`);
     cacheData();
   } catch (error) {
     ErrorAnalytics.track('fetchDodi', error, { source: 'esd.whs.mil via proxy' });
     console.error('[DODI] Failed:', error.message);
+    feedLoadErrors.dodi = error.message || 'Unknown error';
   }
 }
 
@@ -1687,7 +1743,8 @@ function showAlnavSecnavErrorMessage() {
 // Filter and Search Functions
 function filterMessages() {
   const searchTerm = searchInput.value.toLowerCase().trim();
-  const dateRange = currentDateRange;
+  const dateRange = effectiveDateRange(currentMessageType);
+  syncDateRangeButtons();
 
   // Get messages based on current type
   let allMessages = [];
@@ -1806,6 +1863,8 @@ function handleQuickFilter(button) {
 
   // Update current date range
   currentDateRange = parseInt(days);
+  // A click is a deliberate choice, so exempt types honor it from here on.
+  dateRangeExplicit = true;
 
   // Save preference
   localStorage.setItem('filter_date_range', days);
@@ -1879,12 +1938,14 @@ function updateResultsCount() {
 
 // Update tab counters with filtered message counts
 function updateTabCounters() {
-  const dateRange = currentDateRange;
   const searchTerm = searchInput.value.toLowerCase().trim();
 
-  // Helper function to get filtered count for a type
-  function getFilteredCount(messages) {
+  // Helper function to get filtered count for a type. The range is resolved
+  // per type, so an exempt tab reports its full catalog rather than the
+  // handful of entries inside the default window.
+  function getFilteredCount(messages, type) {
     let filtered = messages;
+    const dateRange = effectiveDateRange(type);
 
     // Apply date filter
     if (dateRange > 0) {
@@ -1909,47 +1970,47 @@ function updateTabCounters() {
 
     switch(type) {
       case 'maradmin':
-        count = getFilteredCount(allMaradmins);
+        count = getFilteredCount(allMaradmins, type);
         baseText = 'MARADMIN';
         break;
       case 'mcpub':
-        count = getFilteredCount(allMcpubs);
+        count = getFilteredCount(allMcpubs, type);
         baseText = 'MCPEL';
         break;
       case 'alnav':
-        count = getFilteredCount(allAlnavs);
+        count = getFilteredCount(allAlnavs, type);
         baseText = 'ALNAV';
         break;
       case 'almar':
-        count = getFilteredCount(allAlmars);
+        count = getFilteredCount(allAlmars, type);
         baseText = 'ALMAR';
         break;
       case 'dodforms':
-        count = getFilteredCount(allDodForms);
+        count = getFilteredCount(allDodForms, type);
         baseText = 'DD FORMS';
         break;
       case 'igmc':
-        count = getFilteredCount(allIgmcChecklists);
+        count = getFilteredCount(allIgmcChecklists, type);
         baseText = 'FA CHECKLISTS';
         break;
       case 'navmc':
-        count = getFilteredCount(allNavmcForms);
+        count = getFilteredCount(allNavmcForms, type);
         baseText = 'NAVMC FORMS';
         break;
       case 'secnav':
-        count = getFilteredCount(allSecnavs);
+        count = getFilteredCount(allSecnavs, type);
         baseText = 'SECNAV';
         break;
       case 'jtr':
-        count = getFilteredCount(allJtrs);
+        count = getFilteredCount(allJtrs, type);
         baseText = 'DTMO (JTR)';
         break;
       case 'dodfmr':
-        count = getFilteredCount(allDodFmr);
+        count = getFilteredCount(allDodFmr, type);
         baseText = 'DODFMR';
         break;
       case 'dodi':
-        count = getFilteredCount(allDodi);
+        count = getFilteredCount(allDodi, type);
         baseText = 'DODI';
         break;
       case 'paa':
@@ -1961,7 +2022,7 @@ function updateTabCounters() {
         return;
       case 'all':
         // Exclude ALNAV and SECNAV from All Messages count
-        count = getFilteredCount([...allMaradmins, ...allMcpubs, ...allAlmars, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi]);
+        count = getFilteredCount([...allMaradmins, ...allMcpubs, ...allAlmars, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi], type);
         baseText = 'All Messages';
         break;
     }
@@ -2103,6 +2164,39 @@ function firstSentence(text) {
   return m ? m[0] : text.substring(0,150)+"...";
 }
 
+// Empty result set with a recorded fetch failure is a load error, not a
+// filter miss. The prior single message made a blocked cross-origin fetch
+// indistinguishable from a search returning nothing.
+// Built with textContent to keep upstream error strings out of innerHTML.
+function renderEmptyState() {
+  resultsDiv.innerHTML = '';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'no-results';
+  wrapper.setAttribute('role', 'status');
+
+  const failure = feedLoadErrors[currentMessageType];
+  const primary = document.createElement('p');
+  primary.textContent = failure
+    ? 'This source failed to load. Results are unavailable, not empty.'
+    : 'No messages found matching your criteria.';
+  wrapper.appendChild(primary);
+
+  if (failure) {
+    const detail = document.createElement('p');
+    detail.className = 'no-results-detail';
+    detail.textContent = `Reason: ${failure}`;
+    wrapper.appendChild(detail);
+
+    const hint = document.createElement('p');
+    hint.className = 'no-results-detail';
+    hint.textContent = 'A "Failed to fetch" reason points at the proxy: unreachable, rate limited, or missing this origin from its CORS allowlist.';
+    wrapper.appendChild(hint);
+  }
+
+  resultsDiv.appendChild(wrapper);
+}
+
 function renderMaradmins(arr) {
   resultsDiv.innerHTML = "";
 
@@ -2111,7 +2205,7 @@ function renderMaradmins(arr) {
   summaryStatsDiv.classList.remove('hidden');
 
   if (arr.length === 0) {
-    resultsDiv.innerHTML = '<div class="no-results">No messages found matching your criteria.</div>';
+    renderEmptyState();
     return;
   }
 
@@ -2491,23 +2585,51 @@ function debounce(func, wait) {
   };
 }
 
-function cacheData() {
+// Write one cache key in isolation. A single oversized payload throws
+// QuotaExceededError, and a shared try block would abandon every remaining
+// key. Isolating each write keeps one failure from wiping the whole cache.
+function writeCacheKey(key, value) {
   try {
-    const now = new Date().toISOString();
-    localStorage.setItem("maradmin_cache", JSON.stringify(allMaradmins));
-    localStorage.setItem("mcpub_cache", JSON.stringify(allMcpubs));
-    localStorage.setItem("alnav_cache", JSON.stringify(allAlnavs));
-    localStorage.setItem("almar_cache", JSON.stringify(allAlmars));
-    localStorage.setItem("dodforms_cache", JSON.stringify(allDodForms));
-    localStorage.setItem("secnav_cache", JSON.stringify(allSecnavs));
-    localStorage.setItem("jtr_cache", JSON.stringify(allJtrs));
-    localStorage.setItem("dodfmr_cache", JSON.stringify(allDodFmr));
-    localStorage.setItem("cache_timestamp", now);
-
-    console.log('[Cache] Data cached successfully at', now);
-  } catch(e) {
-    console.error("Failed to cache data:", e);
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (e) {
+    console.warn(`[Cache] Failed to write ${key}: ${e.name || 'Error'}`);
+    return false;
   }
+}
+
+function cacheData() {
+  const now = new Date().toISOString();
+  // NAVMC caches the raw DLA records, not the mapped output. Mapped records
+  // carry searchText and searchTokens, which roughly triple the payload and
+  // push the whole cache toward the localStorage quota.
+  const entries = [
+    ["maradmin_cache", allMaradmins],
+    ["mcpub_cache", allMcpubs],
+    ["alnav_cache", allAlnavs],
+    ["almar_cache", allAlmars],
+    ["dodforms_cache", allDodForms],
+    ["secnav_cache", allSecnavs],
+    ["jtr_cache", allJtrs],
+    ["dodfmr_cache", allDodFmr],
+    ["navmc_raw_cache", allNavmcRaw],
+    ["dodi_cache", allDodi]
+  ];
+
+  let written = 0;
+  entries.forEach(([key, value]) => {
+    if (writeCacheKey(key, value)) {
+      written += 1;
+    }
+  });
+
+  try {
+    localStorage.setItem("cache_timestamp", now);
+  } catch (e) {
+    console.error("Failed to write cache timestamp:", e);
+  }
+
+  console.log(`[Cache] ${written}/${entries.length} keys cached at`, now);
 }
 
 function loadCachedData() {
@@ -2524,7 +2646,8 @@ function loadCachedData() {
         console.log(`[Cache] Main cache expired (age: ${Math.round(cacheAge / 1000 / 60)} minutes), clearing frequently-updated feeds...`);
         const feedCacheKeys = [
           "maradmin_cache", "mcpub_cache", "alnav_cache", "almar_cache",
-          "dodforms_cache", "secnav_cache", "jtr_cache", "dodfmr_cache", "cache_timestamp"
+          "dodforms_cache", "secnav_cache", "jtr_cache", "dodfmr_cache",
+          "navmc_raw_cache", "dodi_cache", "cache_timestamp"
         ];
         feedCacheKeys.forEach(key => localStorage.removeItem(key));
         mainCacheExpired = true;
@@ -2610,6 +2733,28 @@ function loadCachedData() {
     if (dodfmrCache) {
       allDodFmr = JSON.parse(dodfmrCache);
       allDodFmr = allDodFmr.map(m => ({
+        ...m,
+        pubDateObj: new Date(m.pubDate)
+      }));
+    }
+
+    // NAVMC hydrates from raw DLA records through the same mapper the live
+    // fetch uses, so cached and fresh records are structurally identical.
+    const navmcRawCache = localStorage.getItem("navmc_raw_cache");
+    if (navmcRawCache) {
+      const rawRecords = JSON.parse(navmcRawCache);
+      if (Array.isArray(rawRecords) && rawRecords.length > 0) {
+        allNavmcRaw = rawRecords;
+        allNavmcForms = rawRecords.map(mapNavmcRecord);
+        allNavmcForms.sort((a, b) => b.pubDateObj - a.pubDateObj);
+        console.log(`[Cache] Hydrated ${allNavmcForms.length} NAVMC Forms`);
+      }
+    }
+
+    const dodiCache = localStorage.getItem("dodi_cache");
+    if (dodiCache) {
+      allDodi = JSON.parse(dodiCache);
+      allDodi = allDodi.map(m => ({
         ...m,
         pubDateObj: new Date(m.pubDate)
       }));

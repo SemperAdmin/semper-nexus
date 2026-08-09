@@ -1,0 +1,9 @@
+---
+applications:
+  - name: nexus
+    memory: 128M
+    disk_quota: 1G
+    instances: 1
+    path: dist
+    buildpacks:
+      - staticfile_buildpack
