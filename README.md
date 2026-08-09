@@ -106,6 +106,23 @@ npm run build
 npm run preview
 ```
 
+## Deployment
+
+Two frontends and one API proxy, all serving the same repository.
+
+| Target | URL | How it deploys |
+|---|---|---|
+| GitHub Pages | https://semperadmin.github.io/semper-nexus/ | Automatic on push to main, `deploy-github-pages.yml` |
+| cloud.gov | https://nexus.app.cloud.gov | Manual `cf push`, see [docs/CLOUDGOV-DEPLOY.md](docs/CLOUDGOV-DEPLOY.md) |
+| API proxy | https://usmc-directives-proxy.onrender.com | Automatic on merge, Render, root directory `proxy-server` |
+
+Every target must serve the Vite build output. Serving the repository root
+leaves `vendor/purify.min.js` missing, the sanitizer fails closed by design,
+and every result card renders blank while the counts still look correct.
+
+[docs/DEPLOYMENT-BASELINE.md](docs/DEPLOYMENT-BASELINE.md) records the verified
+topology, health-check commands, and the failure modes seen in production.
+
 ## Files
 
 - `index.html` - Main HTML structure
@@ -114,6 +131,8 @@ npm run preview
 - `manifest.json` - PWA manifest
 - `service-worker.js` - Offline caching
 - `lib/` - Static data files for placeholder feeds
+- `proxy-server/` - CORS proxy and DLA forms aggregation, deployed to Render
+- `docs/` - Deployment baseline, runbooks, and security audit
 
 ## Browser Support
 

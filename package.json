@@ -16,7 +16,6 @@
     "fetch-static": "npm run fetch-fa && npm run generate-secnav && npm run generate-alnav",
     "fetch-all": "npm run fetch-static",
     "update-data": "npm run generate-static",
-    "update-vendor": "node -e \"const fs=require('fs');fs.mkdirSync('vendor',{recursive:true});fs.copyFileSync('node_modules/dompurify/dist/purify.min.js','vendor/purify.min.js');fs.copyFileSync('node_modules/web-vitals/dist/web-vitals.iife.js','vendor/web-vitals.iife.js');console.log('vendor/ refreshed from node_modules');\"",
     "lint": "eslint app.js --fix",
     "format": "prettier --write \"*.{js,html,css,md}\"",
     "format:check": "prettier --check \"*.{js,html,css,md}\""
