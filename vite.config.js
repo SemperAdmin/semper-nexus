@@ -13,12 +13,16 @@ export default defineConfig({
         { src: 'pwa-init.js', dest: '' },
         { src: 'service-worker.js', dest: '' },
         { src: 'semper-tokens.css', dest: '' },
-        // Self-hosted web-vitals and DOMPurify. Committed under vendor/ so the
-        // app also renders when the repository root is served directly (any
-        // static host without a build step): safe-html.js fails closed when
-        // vendor/purify.min.js 404s, which blanks every card and stat box.
-        // Refresh the committed copies with: npm run update-vendor
-        { src: 'vendor/*', dest: 'vendor' },
+        // Self-hosted web-vitals and DOMPurify, sourced from node_modules so
+        // package-lock.json stays the single source of truth. Copying from a
+        // committed vendor/ directory instead would silently pin production to
+        // a stale DOMPurify: a Dependabot security bump lands in node_modules
+        // and never reaches the build.
+        // Every deploy target must serve the build output, never the repo root.
+        // safe-html.js fails closed when vendor/purify.min.js 404s, which
+        // blanks every card and stat box.
+        { src: 'node_modules/web-vitals/dist/web-vitals.iife.js', dest: 'vendor' },
+        { src: 'node_modules/dompurify/dist/purify.min.js', dest: 'vendor' },
         // Self-hosted fontsource fonts (Phase 1.3c - replaces jsdelivr CDN)
         { src: 'node_modules/@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff2', dest: 'fonts' },
         { src: 'node_modules/@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff', dest: 'fonts' },

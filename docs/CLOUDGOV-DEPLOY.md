@@ -1,6 +1,8 @@
 # cloud.gov Deployment - Semper Nexus Frontend
 
-Last verified: 2026-07-07. Build tested against main at commit 448dd7b.
+Last verified: 2026-08-09 against main at commit 1adc075, end to end in a real
+browser. See [DEPLOYMENT-BASELINE.md](DEPLOYMENT-BASELINE.md) for the full
+verified topology, health-check commands, and known failure modes.
 
 ## Architecture
 
@@ -41,6 +43,17 @@ cf push
 1. Open `https://nexus.app.cloud.gov` - page loads, no 404s in DevTools Network tab.
 2. Trigger a directive search - confirm calls to `usmc-directives-proxy.onrender.com` return 200, not CORS errors.
 3. Check the PWA installs and the service worker registers (DevTools > Application).
+4. Confirm the running code is the code you pushed. An installed service worker
+   from a prior deploy has served a stale document before, making a correct
+   deploy look like it had no effect. In the console:
+   `document.querySelector('script[src*="app.js"]').getAttribute('src')`
+   The version query must match `index.html` in the commit you deployed.
+5. Confirm the build was deployed rather than the repository root:
+   `https://nexus.app.cloud.gov/package.json` must return 404 and
+   `https://nexus.app.cloud.gov/vendor/purify.min.js` must return 200. A missing
+   `purify.min.js` makes the sanitizer fail closed, blanking every card while
+   the counts still read correctly. A red banner at the top of the page names
+   this condition.
 
 ## Known Constraints
 
