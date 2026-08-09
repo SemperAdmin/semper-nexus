@@ -8,7 +8,10 @@ export default defineConfig({
   plugins: [
     viteStaticCopy({
       targets: [
-        { src: 'lib/*', dest: 'lib' },
+        // vite-plugin-static-copy v4 preserves the full source path under
+        // dest; rename.stripBase / rename.name flatten each target back to
+        // the layout index.html expects (lib/, vendor/, fonts/).
+        { src: 'lib/*', dest: 'lib', rename: { stripBase: 1 } },
         { src: 'app.js', dest: '' },
         { src: 'pwa-init.js', dest: '' },
         { src: 'service-worker.js', dest: '' },
@@ -21,14 +24,14 @@ export default defineConfig({
         // Every deploy target must serve the build output, never the repo root.
         // safe-html.js fails closed when vendor/purify.min.js 404s, which
         // blanks every card and stat box.
-        { src: 'node_modules/web-vitals/dist/web-vitals.iife.js', dest: 'vendor' },
-        { src: 'node_modules/dompurify/dist/purify.min.js', dest: 'vendor' },
+        { src: 'node_modules/web-vitals/dist/web-vitals.iife.js', dest: 'vendor', rename: { stripBase: 3 } },
+        { src: 'node_modules/dompurify/dist/purify.min.js', dest: 'vendor', rename: { stripBase: 3 } },
         // Self-hosted fontsource fonts (Phase 1.3c - replaces jsdelivr CDN)
-        { src: 'node_modules/@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff2', dest: 'fonts' },
-        { src: 'node_modules/@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff', dest: 'fonts' },
-        { src: 'node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2', dest: 'fonts' },
-        { src: 'node_modules/@fontsource-variable/inter/files/inter-latin-wght-italic.woff2', dest: 'fonts' },
-        { src: 'node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2', dest: 'fonts' }
+        { src: 'node_modules/@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff2', dest: 'fonts', rename: { stripBase: 4 } },
+        { src: 'node_modules/@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff', dest: 'fonts', rename: { stripBase: 4 } },
+        { src: 'node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2', dest: 'fonts', rename: { stripBase: 4 } },
+        { src: 'node_modules/@fontsource-variable/inter/files/inter-latin-wght-italic.woff2', dest: 'fonts', rename: { stripBase: 4 } },
+        { src: 'node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2', dest: 'fonts', rename: { stripBase: 4 } }
       ]
     })
   ],
@@ -47,9 +50,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: './index.html'
-      },
-      output: {
-        manualChunks: {}
       }
     },
     assetsInlineLimit: 4096,
