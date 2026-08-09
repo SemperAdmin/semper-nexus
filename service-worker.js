@@ -3,25 +3,26 @@
 
 // Cache version - update this when deploying new versions
 // Format: v{major}.{minor}.{patch}-{timestamp}
-const CACHE_VERSION = 'v2.5.0-20260809';
+const CACHE_VERSION = 'v2.6.0-20260809';
 const CACHE_NAME = `semper-nexus-${CACHE_VERSION}`;
 
-// Assets to cache immediately on install
+// Assets to cache immediately on install.
+// Paths are relative to the service worker scope, NOT root-absolute: the app
+// serves from / on cloud.gov but /semper-nexus/ on GitHub Pages, and absolute
+// paths 404 there. One 404 rejects cache.addAll, which failed the whole
+// install and silently disabled offline support on every deploy target
+// (the list also named two images that no longer exist).
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/app.js',
-  '/style.css',
-  '/ai-improvements.css',
-  '/image.png',
-  '/IMG_2324.jpeg',
-  '/lib/fa-checklists.js',
-  '/lib/secnav-data.js',
-  '/lib/alnav-data.js',
-  '/manifest.json',
-  '/icon.svg',
-  '/logo.png'
+  './',
+  './index.html',
+  './app.js',
+  './lib/fa-checklists.js',
+  './lib/secnav-data.js',
+  './lib/alnav-data.js'
 ];
+// manifest.json and icon.svg are NOT precached: Vite rewrites their
+// references to hashed assets/ URLs in the build, so the root copies 404
+// there. They get cached on first use by the fetch handler instead.
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
@@ -154,8 +155,9 @@ async function cacheFirst(request) {
   } catch (error) {
     console.error('[Service Worker] Fetch failed:', error);
 
-    // Return offline page if available
-    const cachedResponse = await caches.match('/index.html');
+    // Return offline page if available. Relative to SW scope, matching the
+    // precached URL - '/index.html' misses under the /semper-nexus/ base.
+    const cachedResponse = await caches.match('./index.html');
     if (cachedResponse) {
       return cachedResponse;
     }
