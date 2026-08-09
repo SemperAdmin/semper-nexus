@@ -21,9 +21,13 @@ export default defineConfig({
         // committed vendor/ directory instead would silently pin production to
         // a stale DOMPurify: a Dependabot security bump lands in node_modules
         // and never reaches the build.
-        // Every deploy target must serve the build output, never the repo root.
-        // safe-html.js fails closed when vendor/purify.min.js 404s, which
-        // blanks every card and stat box.
+        // A vendor/ copy IS also committed, but only so the app still works
+        // when the repository root is served directly (local static servers,
+        // a mis-deployed root): safe-html.js fails closed when
+        // vendor/purify.min.js 404s, blanking every card and stat box behind
+        // the red banner. Builds never read the committed copy - these
+        // node_modules paths win. Refresh it after dependency bumps with:
+        // npm run update-vendor
         { src: 'node_modules/web-vitals/dist/web-vitals.iife.js', dest: 'vendor', rename: { stripBase: 3 } },
         { src: 'node_modules/dompurify/dist/purify.min.js', dest: 'vendor', rename: { stripBase: 3 } },
         // Self-hosted fontsource fonts (Phase 1.3c - replaces jsdelivr CDN)

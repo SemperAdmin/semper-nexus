@@ -234,7 +234,7 @@ const summaryStatsDiv = document.getElementById("summaryStats");
 const lastUpdateSpan = document.getElementById("lastUpdate");
 const searchInput = document.getElementById("searchInput");
 // Date range is now controlled by buttons only (dropdown removed)
-const DEFAULT_DATE_RANGE = 7; // "This Week"
+const DEFAULT_DATE_RANGE = 1; // "Today"
 let currentDateRange = DEFAULT_DATE_RANGE;
 
 // Reference catalogs, not dated message traffic. NAVMC forms span decades:
