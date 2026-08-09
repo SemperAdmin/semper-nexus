@@ -52,8 +52,8 @@ cf push
    `https://nexus.app.cloud.gov/package.json` must return 404 and
    `https://nexus.app.cloud.gov/vendor/purify.min.js` must return 200. A missing
    `purify.min.js` makes the sanitizer fail closed, blanking every card while
-   the counts still read correctly. A red banner at the top of the page names
-   this condition.
+   the counts still read correctly. The browser console logs a [SafeHTML]
+   warning naming this condition.
 
 ## Known Constraints
 
