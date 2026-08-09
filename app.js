@@ -236,6 +236,36 @@ const searchInput = document.getElementById("searchInput");
 // Date range is now controlled by buttons only (dropdown removed)
 const DEFAULT_DATE_RANGE = 7; // "This Week"
 let currentDateRange = DEFAULT_DATE_RANGE;
+
+// Reference catalogs, not dated message traffic. NAVMC forms span decades:
+// 703 of 824 are older than a year and exactly 1 falls inside a 7-day window,
+// so the default range hid the entire catalog behind a "Showing 1 of 824".
+const DATE_FILTER_EXEMPT_TYPES = new Set(['navmc', 'dodforms', 'dodi', 'igmc']);
+
+// True once the user clicks a range button in this session. A restored
+// localStorage preference does not count, since handleDateRangeChange writes
+// that key on every programmatic update and would make every later session
+// look like a deliberate choice.
+let dateRangeExplicit = false;
+
+// Range actually applied to a given message type.
+function effectiveDateRange(type) {
+  if (!dateRangeExplicit && DATE_FILTER_EXEMPT_TYPES.has(type)) {
+    return 0; // All
+  }
+  return currentDateRange;
+}
+
+// Keep the range buttons honest about the range in force. Without this, an
+// exempt tab shows 824 results while "This Week" stays highlighted.
+function syncDateRangeButtons() {
+  const active = effectiveDateRange(currentMessageType);
+  quickFilterButtons.forEach(btn => {
+    const isActive = parseInt(btn.dataset.days) === active;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive);
+  });
+}
 const clearSearchBtn = document.getElementById("clearSearch");
 const messageTypeButtons = document.querySelectorAll(".message-type-btn");
 const quickFilterButtons = document.querySelectorAll(".quick-filter-btn");
@@ -1713,7 +1743,8 @@ function showAlnavSecnavErrorMessage() {
 // Filter and Search Functions
 function filterMessages() {
   const searchTerm = searchInput.value.toLowerCase().trim();
-  const dateRange = currentDateRange;
+  const dateRange = effectiveDateRange(currentMessageType);
+  syncDateRangeButtons();
 
   // Get messages based on current type
   let allMessages = [];
@@ -1832,6 +1863,8 @@ function handleQuickFilter(button) {
 
   // Update current date range
   currentDateRange = parseInt(days);
+  // A click is a deliberate choice, so exempt types honor it from here on.
+  dateRangeExplicit = true;
 
   // Save preference
   localStorage.setItem('filter_date_range', days);
@@ -1905,12 +1938,14 @@ function updateResultsCount() {
 
 // Update tab counters with filtered message counts
 function updateTabCounters() {
-  const dateRange = currentDateRange;
   const searchTerm = searchInput.value.toLowerCase().trim();
 
-  // Helper function to get filtered count for a type
-  function getFilteredCount(messages) {
+  // Helper function to get filtered count for a type. The range is resolved
+  // per type, so an exempt tab reports its full catalog rather than the
+  // handful of entries inside the default window.
+  function getFilteredCount(messages, type) {
     let filtered = messages;
+    const dateRange = effectiveDateRange(type);
 
     // Apply date filter
     if (dateRange > 0) {
@@ -1935,47 +1970,47 @@ function updateTabCounters() {
 
     switch(type) {
       case 'maradmin':
-        count = getFilteredCount(allMaradmins);
+        count = getFilteredCount(allMaradmins, type);
         baseText = 'MARADMIN';
         break;
       case 'mcpub':
-        count = getFilteredCount(allMcpubs);
+        count = getFilteredCount(allMcpubs, type);
         baseText = 'MCPEL';
         break;
       case 'alnav':
-        count = getFilteredCount(allAlnavs);
+        count = getFilteredCount(allAlnavs, type);
         baseText = 'ALNAV';
         break;
       case 'almar':
-        count = getFilteredCount(allAlmars);
+        count = getFilteredCount(allAlmars, type);
         baseText = 'ALMAR';
         break;
       case 'dodforms':
-        count = getFilteredCount(allDodForms);
+        count = getFilteredCount(allDodForms, type);
         baseText = 'DD FORMS';
         break;
       case 'igmc':
-        count = getFilteredCount(allIgmcChecklists);
+        count = getFilteredCount(allIgmcChecklists, type);
         baseText = 'FA CHECKLISTS';
         break;
       case 'navmc':
-        count = getFilteredCount(allNavmcForms);
+        count = getFilteredCount(allNavmcForms, type);
         baseText = 'NAVMC FORMS';
         break;
       case 'secnav':
-        count = getFilteredCount(allSecnavs);
+        count = getFilteredCount(allSecnavs, type);
         baseText = 'SECNAV';
         break;
       case 'jtr':
-        count = getFilteredCount(allJtrs);
+        count = getFilteredCount(allJtrs, type);
         baseText = 'DTMO (JTR)';
         break;
       case 'dodfmr':
-        count = getFilteredCount(allDodFmr);
+        count = getFilteredCount(allDodFmr, type);
         baseText = 'DODFMR';
         break;
       case 'dodi':
-        count = getFilteredCount(allDodi);
+        count = getFilteredCount(allDodi, type);
         baseText = 'DODI';
         break;
       case 'paa':
@@ -1987,7 +2022,7 @@ function updateTabCounters() {
         return;
       case 'all':
         // Exclude ALNAV and SECNAV from All Messages count
-        count = getFilteredCount([...allMaradmins, ...allMcpubs, ...allAlmars, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi]);
+        count = getFilteredCount([...allMaradmins, ...allMcpubs, ...allAlmars, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi], type);
         baseText = 'All Messages';
         break;
     }

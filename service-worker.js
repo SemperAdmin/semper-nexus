@@ -3,7 +3,7 @@
 
 // Cache version - update this when deploying new versions
 // Format: v{major}.{minor}.{patch}-{timestamp}
-const CACHE_VERSION = 'v2.4.2-20260703';
+const CACHE_VERSION = 'v2.5.0-20260809';
 const CACHE_NAME = `semper-nexus-${CACHE_VERSION}`;
 
 // Assets to cache immediately on install
@@ -112,6 +112,16 @@ self.addEventListener('fetch', (event) => {
     if (apiHosts.some(host => url.hostname === host || url.hostname.endsWith('.' + host))) {
       event.respondWith(networkFirst(request));
     }
+    return;
+  }
+
+  // HTML documents use network-first. Cache-first on the document pinned the
+  // app to a stale index.html indefinitely: the cached copy referenced an old
+  // app.js query string and an old CSP connect-src, so a fresh deploy stayed
+  // invisible and cross-origin fetches to the current proxy host were blocked.
+  // Versioned assets keep cache-first, since their ?v= query busts the cache.
+  if (request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
+    event.respondWith(networkFirst(request));
     return;
   }
 
