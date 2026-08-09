@@ -22,7 +22,7 @@ The application currently has a **Content Security Policy (CSP)** configured in 
     https://www.esd.whs.mil
     https://comptroller.war.gov
     https://www.travel.dod.mil
-    https://semper-nexus-proxy.onrender.com
+    https://usmc-directives-proxy.onrender.com
     http://localhost:3000
     https://corsproxy.io
     https://api.allorigins.win
@@ -200,7 +200,7 @@ server {
     add_header Cross-Origin-Resource-Policy "same-origin" always;
 
     # Content-Security-Policy (move from meta tag for better support)
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://unpkg.com/web-vitals@3.5.0/; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https://www.marines.mil https://www.mynavyhr.navy.mil https://www.secnav.navy.mil https://www.igmc.marines.mil https://www.esd.whs.mil https://comptroller.war.gov https://www.travel.dod.mil https://semper-nexus-proxy.onrender.com http://localhost:3000 https://corsproxy.io https://api.allorigins.win https://cors-anywhere.herokuapp.com https://api.codetabs.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests;" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://unpkg.com/web-vitals@3.5.0/; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https://www.marines.mil https://www.mynavyhr.navy.mil https://www.secnav.navy.mil https://www.igmc.marines.mil https://www.esd.whs.mil https://comptroller.war.gov https://www.travel.dod.mil https://usmc-directives-proxy.onrender.com http://localhost:3000 https://corsproxy.io https://api.allorigins.win https://cors-anywhere.herokuapp.com https://api.codetabs.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests;" always;
 }
 ```
 

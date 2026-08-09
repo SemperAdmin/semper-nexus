@@ -49,7 +49,7 @@ jobs:
           # Catch curl errors (e.g., timeout exit code 28) to prevent workflow failure
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
             --max-time 60 \
-            https://semper-nexus-proxy.onrender.com/health) || RESPONSE="timeout"
+            https://usmc-directives-proxy.onrender.com/health) || RESPONSE="timeout"
 
           if [ "$RESPONSE" = "200" ]; then
             echo "✅ Server is alive (HTTP $RESPONSE)"
@@ -77,4 +77,4 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "This workflow pings the proxy server to prevent cold starts on Render's free tier while minimizing CI/CD costs." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Server URL:** https://semper-nexus-proxy.onrender.com" >> $GITHUB_STEP_SUMMARY
+          echo "**Server URL:** https://usmc-directives-proxy.onrender.com" >> $GITHUB_STEP_SUMMARY

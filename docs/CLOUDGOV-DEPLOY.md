@@ -5,7 +5,7 @@ Last verified: 2026-07-07. Build tested against main at commit 448dd7b.
 ## Architecture
 
 - Static frontend (this repo, built by Vite into `dist/`) deploys to cloud.gov via the staticfile buildpack.
-- The API proxy (`proxy-server/`) stays on Render at `https://semper-nexus-proxy.onrender.com`. It is NOT part of this cf push.
+- The API proxy (`proxy-server/`) stays on Render at `https://usmc-directives-proxy.onrender.com`. It is NOT part of this cf push.
 - The proxy CORS allowlist in `proxy-server/server.js` must contain your cloud.gov route. `https://nexus.app.cloud.gov` has been added. If your app name or route differs, update line 36 and redeploy the proxy on Render.
 
 ## Prerequisites
@@ -39,7 +39,7 @@ cf push
 ## Post-Deploy Verification
 
 1. Open `https://nexus.app.cloud.gov` - page loads, no 404s in DevTools Network tab.
-2. Trigger a directive search - confirm calls to `semper-nexus-proxy.onrender.com` return 200, not CORS errors.
+2. Trigger a directive search - confirm calls to `usmc-directives-proxy.onrender.com` return 200, not CORS errors.
 3. Check the PWA installs and the service worker registers (DevTools > Application).
 
 ## Known Constraints

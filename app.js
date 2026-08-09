@@ -198,7 +198,7 @@ const DOD_FORMS_URLS = [
 // Leave empty to use fallback CORS proxies (unreliable)
 // Prefer local proxy during development; fall back to deployed URL otherwise
 const CUSTOM_PROXY_URL = (() => {
-  const deployed = "https://semper-nexus-proxy.onrender.com";
+  const deployed = "https://usmc-directives-proxy.onrender.com";
   const local = "http://localhost:3000";
   try {
     if (typeof window !== 'undefined') {

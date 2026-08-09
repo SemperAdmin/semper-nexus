@@ -46,9 +46,9 @@ code.
 confirm the host picked up the latest push:
 
 ```bash
-curl -s https://semper-nexus-proxy.onrender.com/api/health | jq
+curl -s https://usmc-directives-proxy.onrender.com/api/health | jq
 curl -sD - -o /dev/null -H "Origin: https://nexus.app.cloud.gov" \
-  https://semper-nexus-proxy.onrender.com/api/health | grep -i allow-origin
+  https://usmc-directives-proxy.onrender.com/api/health | grep -i allow-origin
 ```
 
 An absent `access-control-allow-origin` on the second command means the host is
@@ -95,6 +95,18 @@ Example: GET /api/proxy?url=https://www.mynavyhr.navy.mil/...
 5. Click "Create Web Service"
 
 Your proxy will be available at: `https://your-app-name.onrender.com`
+
+`render.yaml` declares the same build and start commands, and it applies only
+to Blueprint-managed services. A service created through the dashboard uses the
+dashboard values, so the two drift apart silently. A Build Command of
+`npm run build` fails with `Missing script: "build"` unless the no-op `build`
+script in `package.json` is present.
+
+The live service is `usmc-directives-proxy`, serving
+`https://usmc-directives-proxy.onrender.com`. The frontend `CUSTOM_PROXY_URL`
+in `app.js` and the `connect-src` CSP directive in `index.html` both reference
+this exact hostname. Changing the Render service name changes the hostname and
+breaks both. Update all three together.
 
 ### Option 2: Deploy to Railway.app (Free)
 
