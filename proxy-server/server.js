@@ -25,20 +25,53 @@ if (!GITHUB_TOKEN) {
 // Allows rate limiting to work correctly with X-Forwarded-For headers
 app.set('trust proxy', true);
 
-// Enable CORS for your GitHub Pages site
-// CORS allowlist. furby203824.github.io is the PoC deploy target.
+// CORS allowlist.
+// furby203824.github.io is the PoC deploy target.
+// semperadmin.github.io serves the GitHub Pages build.
 // nexus.github.io is reserved for the Semper Admin migration.
+// nexus.app.cloud.gov is the cloud.gov production frontend.
 // localhost entries cover local dev with Vite/static servers on common ports.
+//
+// ALLOWED_ORIGINS (comma-separated env var) extends this list at runtime so a
+// new frontend origin needs a Render env change, not a code deploy. A stale
+// deploy previously dropped nexus.app.cloud.gov and silently broke every
+// browser fetch from production.
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://furby203824.github.io',
+  'https://semperadmin.github.io',
+  'https://nexus.github.io',
+  'https://nexus.app.cloud.gov',
+  'http://localhost:8000',
+  'http://127.0.0.1:8000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+];
+
+const ALLOWED_ORIGINS = Array.from(new Set([
+  ...DEFAULT_ALLOWED_ORIGINS,
+  ...String(process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean)
+]));
+
+console.log(`[CORS] Allowlist (${ALLOWED_ORIGINS.length}): ${ALLOWED_ORIGINS.join(', ')}`);
+
 app.use(cors({
-  origin: [
-    'https://furby203824.github.io',
-    'https://nexus.github.io',
-    'https://nexus.app.cloud.gov',
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173'
-  ],
+  origin: (origin, callback) => {
+    // No Origin header: curl, server-to-server, and same-origin navigations.
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`[CORS] Blocked origin: ${origin}`);
+    // Resolve false rather than throwing. Throwing yields a 500 and hides the
+    // real cause. Resolving false omits the ACAO header and lets the browser
+    // enforce the block, which is the intended behavior.
+    return callback(null, false);
+  },
   methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -76,7 +109,15 @@ const httpsAgent = new https.Agent({
 // /api/health alias keeps the URL shape consistent with other API routes,
 // useful for Render health probes and frontend uptime checks.
 app.get(['/health', '/api/health'], (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  // commit and corsAllowlist make deploy staleness detectable from outside.
+  // A live instance running old code is otherwise indistinguishable from a
+  // current one until a CORS-dependent route fails in a browser.
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    commit: process.env.RENDER_GIT_COMMIT || 'unknown',
+    corsAllowlist: ALLOWED_ORIGINS
+  });
 });
 
 // Debug endpoint to test GitHub API configuration
