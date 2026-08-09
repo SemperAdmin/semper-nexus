@@ -1233,7 +1233,7 @@ function parseDodFmrLinks(doc, sourceUrl) {
     seenHrefs.add(href);
 
     // Build ID
-    let id = null;
+    let id;
     const changeMatch = title.match(/Change\s+(?:Notice\s+)?(\d+)/i) ||
                         title.match(/FMR\s+Change\s+(\d+)/i) ||
                         href.match(/change[_-]?(\d+)/i);
