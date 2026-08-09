@@ -237,27 +237,19 @@ const searchInput = document.getElementById("searchInput");
 const DEFAULT_DATE_RANGE = 1; // "Today"
 let currentDateRange = DEFAULT_DATE_RANGE;
 
-// Reference catalogs, not dated message traffic. NAVMC forms span decades:
-// 703 of 824 are older than a year and exactly 1 falls inside a 7-day window,
-// so the default range hid the entire catalog behind a "Showing 1 of 824".
-const DATE_FILTER_EXEMPT_TYPES = new Set(['navmc', 'dodforms', 'dodi', 'igmc']);
-
-// True once the user clicks a range button in this session. A restored
-// localStorage preference does not count, since handleDateRangeChange writes
-// that key on every programmatic update and would make every later session
-// look like a deliberate choice.
-let dateRangeExplicit = false;
-
-// Range actually applied to a given message type.
-function effectiveDateRange(type) {
-  if (!dateRangeExplicit && DATE_FILTER_EXEMPT_TYPES.has(type)) {
-    return 0; // All
-  }
+// The date range applies uniformly to every message type - reference
+// catalogs (NAVMC, DD Forms, DoDI, FA Checklists) included - and to the
+// All Messages view. Type tabs scope WHICH results are listed; the range
+// buttons scope WHEN. A previous per-type exemption kept catalogs visible
+// inside narrow windows, but it made the tab counters disagree with the
+// range in force; the deliberate model is: pick "All" in the range row to
+// see full catalogs. (Catalog entries with no usable date carry an epoch
+// pubDate, so they only appear under the "All" range.)
+function effectiveDateRange(_type) {
   return currentDateRange;
 }
 
-// Keep the range buttons honest about the range in force. Without this, an
-// exempt tab shows 824 results while "This Week" stays highlighted.
+// Keep the range buttons in sync with the range in force.
 function syncDateRangeButtons() {
   const active = effectiveDateRange(currentMessageType);
   quickFilterButtons.forEach(btn => {
@@ -1780,17 +1772,12 @@ function filterMessages() {
   console.log(`Starting filter with ${allMessages.length} total ${currentMessageType.toUpperCase()} messages`);
   let filtered = allMessages;
 
-  // Apply date filter. Exemption is per ITEM, not just per tab: inside
-  // "All Messages" the reference catalogs (NAVMC, DD Forms, DoDI, FA
-  // Checklists) must survive the default window, or All collapses to the
-  // handful of items published inside it while each catalog tab shows
-  // hundreds. Same rule as effectiveDateRange: an explicit user click on a
-  // range button filters everything.
+  // Apply date filter uniformly - every type, catalogs included
   if (dateRange > 0) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - dateRange);
     console.log(`Filtering by date: last ${dateRange} days (since ${cutoffDate.toLocaleDateString()})`);
-    filtered = filtered.filter(m => (!dateRangeExplicit && DATE_FILTER_EXEMPT_TYPES.has(m.type)) || m.pubDateObj >= cutoffDate);
+    filtered = filtered.filter(m => m.pubDateObj >= cutoffDate);
     console.log(`After date filter: ${filtered.length} messages`);
   }
 
@@ -1869,8 +1856,6 @@ function handleQuickFilter(button) {
 
   // Update current date range
   currentDateRange = parseInt(days);
-  // A click is a deliberate choice, so exempt types honor it from here on.
-  dateRangeExplicit = true;
 
   // Save preference
   localStorage.setItem('filter_date_range', days);
@@ -1953,12 +1938,11 @@ function updateTabCounters() {
     let filtered = messages;
     const dateRange = effectiveDateRange(type);
 
-    // Apply date filter, exempting catalog items the same way
-    // filterMessages does so the All counter matches the All view.
+    // Apply date filter uniformly, matching filterMessages
     if (dateRange > 0) {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - dateRange);
-      filtered = filtered.filter(m => (!dateRangeExplicit && DATE_FILTER_EXEMPT_TYPES.has(m.type)) || m.pubDateObj >= cutoffDate);
+      filtered = filtered.filter(m => m.pubDateObj >= cutoffDate);
     }
 
     // Apply search filter
