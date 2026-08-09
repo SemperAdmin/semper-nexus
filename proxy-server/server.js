@@ -79,8 +79,10 @@ app.use(cors({
   maxAge: 86400 // 24 hours
 }));
 
-// Handle preflight requests explicitly
-app.options('*', cors());
+// Preflight requests are handled by the allowlisted cors() middleware above.
+// Express 5 (path-to-regexp v8) rejects bare '*' route strings at startup,
+// and the old app.options('*', cors()) also answered preflights with an
+// unrestricted default cors() instead of the allowlist.
 
 // Enable JSON body parsing
 app.use(express.json());
