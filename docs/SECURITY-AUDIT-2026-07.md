@@ -17,7 +17,7 @@ applied.
 - Trust note: **the README is stale.** It advertises a multi-vendor public
   CORS-proxy fallback chain (corsproxy.io, allorigins.win, …), but the code
   (`app.js:200-214`) routes every cross-origin fetch through a **single
-  self-hosted proxy** (`semper-nexus-proxy.onrender.com`; `localhost:3000` in
+  self-hosted proxy** (`usmc-directives-proxy.onrender.com`; `localhost:3000` in
   dev), and actively purges old public-relay preferences from localStorage
   (`app.js:221-226`). Proxied content is still attacker-influenced — a
   compromised proxy or on-path attacker can tamper with responses — but the
@@ -47,7 +47,7 @@ string with no dot boundary.
 1. Attacker registers `myrss.app` (or any `*rss.app`), or finds a hostname
    ending `rss.app`.
 2. Attacker requests
-   `https://semper-nexus-proxy.onrender.com/api/proxy?url=https://myrss.app/x`.
+   `https://usmc-directives-proxy.onrender.com/api/proxy?url=https://myrss.app/x`.
 3. `"myrss.app".endsWith("rss.app")` is `true` → the check passes → the server
    fetches attacker-controlled URL and returns the body to the caller.
 4. The proxy is now an **open relay** an attacker can point at their own host:
