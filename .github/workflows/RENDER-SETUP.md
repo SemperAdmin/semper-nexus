@@ -48,7 +48,7 @@ Click **Create Web Service**. Render will:
 1. Clone your repository.
 2. Install dependencies in `proxy-server/`.
 3. Start the server with `npm start`.
-4. Assign a URL like `https://semper-nexus-proxy.onrender.com`.
+4. Assign a URL like `https://usmc-directives-proxy.onrender.com`.
 
 First deployment takes 2-3 minutes.
 
@@ -57,7 +57,7 @@ First deployment takes 2-3 minutes.
 Update `app.js`:
 
 ```javascript
-const CUSTOM_PROXY_URL = "https://semper-nexus-proxy.onrender.com";
+const CUSTOM_PROXY_URL = "https://usmc-directives-proxy.onrender.com";
 ```
 
 Commit and push.
@@ -69,7 +69,7 @@ Render auto-deploys on push to `main` by default. Confirm at Service -> Settings
 ## Step 8: Test the deployment
 
 ```bash
-RENDER_URL="https://semper-nexus-proxy.onrender.com"
+RENDER_URL="https://usmc-directives-proxy.onrender.com"
 
 # 1. Health check
 curl "$RENDER_URL/health"

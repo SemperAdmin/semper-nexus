@@ -1,0 +1,16 @@
+# Normalize line endings on commit. Windows tooling rewrites pulled files as
+# CRLF, and with core.autocrlf=false git records those rewrites as whole-file
+# diffs (a symmetric N insertions / N deletions diffstat is the signature).
+# That churn blocks `git am`, inflates review diffs, and makes the cloud.gov
+# copy of app.js roughly 3 KB larger than the GitHub Pages copy.
+* text=auto eol=lf
+
+# Binary assets: never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

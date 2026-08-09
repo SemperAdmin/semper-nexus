@@ -237,7 +237,7 @@ The system automatically captures technical context to help developers debug iss
    - Check GitHub API rate limit: https://api.github.com/rate_limit
 
 4. **Network issues**
-   - Check if proxy server is running: https://semper-nexus-proxy.onrender.com/health
+   - Check if proxy server is running: https://usmc-directives-proxy.onrender.com/health
    - Verify CORS is configured correctly
 
 ### Issue: Feedback button not visible
@@ -330,7 +330,7 @@ For technical issues with the feedback widget itself:
 
 1. Check this documentation first
 2. Review browser console for errors
-3. Test the `/health` endpoint: https://semper-nexus-proxy.onrender.com/health
+3. Test the `/health` endpoint: https://usmc-directives-proxy.onrender.com/health
 4. Create a GitHub issue manually if the widget is broken
 5. Contact the development team
 
