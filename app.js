@@ -1771,20 +1771,26 @@ function filterMessages() {
   } else if (currentMessageType === 'dodi') {
     allMessages = [...allDodi];
   } else if (currentMessageType === 'all') {
-    // Exclude ALNAV and SECNAV from "All Messages"
-    allMessages = [...allMaradmins, ...allMcpubs, ...allAlmars, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi];
+    // Every connector-backed feed, ALNAV and SECNAV included. Only the
+    // SharePoint link tabs (PAA/PAAN/TAN/FAN/ICAN) have no data to add.
+    allMessages = [...allMaradmins, ...allMcpubs, ...allAlmars, ...allAlnavs, ...allSecnavs, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi];
     allMessages.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
   }
 
   console.log(`Starting filter with ${allMessages.length} total ${currentMessageType.toUpperCase()} messages`);
   let filtered = allMessages;
 
-  // Apply date filter
+  // Apply date filter. Exemption is per ITEM, not just per tab: inside
+  // "All Messages" the reference catalogs (NAVMC, DD Forms, DoDI, FA
+  // Checklists) must survive the default window, or All collapses to the
+  // handful of items published inside it while each catalog tab shows
+  // hundreds. Same rule as effectiveDateRange: an explicit user click on a
+  // range button filters everything.
   if (dateRange > 0) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - dateRange);
     console.log(`Filtering by date: last ${dateRange} days (since ${cutoffDate.toLocaleDateString()})`);
-    filtered = filtered.filter(m => m.pubDateObj >= cutoffDate);
+    filtered = filtered.filter(m => (!dateRangeExplicit && DATE_FILTER_EXEMPT_TYPES.has(m.type)) || m.pubDateObj >= cutoffDate);
     console.log(`After date filter: ${filtered.length} messages`);
   }
 
@@ -1914,8 +1920,8 @@ function updateResultsCount() {
   } else if (currentMessageType === 'dodi') {
     totalCount = allDodi.length;
   } else if (currentMessageType === 'all') {
-    // Exclude ALNAV and SECNAV from All Messages count
-    totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allDodForms.length + allNavmcForms.length + allJtrs.length + allDodFmr.length + allDodi.length;
+    // Every connector-backed feed, matching the All view aggregation
+    totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allAlnavs.length + allSecnavs.length + allDodForms.length + allIgmcChecklists.length + allNavmcForms.length + allJtrs.length + allDodFmr.length + allDodi.length;
   }
 
   const labelMap = {
@@ -1947,11 +1953,12 @@ function updateTabCounters() {
     let filtered = messages;
     const dateRange = effectiveDateRange(type);
 
-    // Apply date filter
+    // Apply date filter, exempting catalog items the same way
+    // filterMessages does so the All counter matches the All view.
     if (dateRange > 0) {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - dateRange);
-      filtered = filtered.filter(m => m.pubDateObj >= cutoffDate);
+      filtered = filtered.filter(m => (!dateRangeExplicit && DATE_FILTER_EXEMPT_TYPES.has(m.type)) || m.pubDateObj >= cutoffDate);
     }
 
     // Apply search filter
@@ -2021,8 +2028,8 @@ function updateTabCounters() {
         // External SharePoint links - leave anchor content untouched
         return;
       case 'all':
-        // Exclude ALNAV and SECNAV from All Messages count
-        count = getFilteredCount([...allMaradmins, ...allMcpubs, ...allAlmars, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi], type);
+        // Every connector-backed feed, matching the All view aggregation
+        count = getFilteredCount([...allMaradmins, ...allMcpubs, ...allAlmars, ...allAlnavs, ...allSecnavs, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi], type);
         baseText = 'All Messages';
         break;
     }
@@ -2058,8 +2065,8 @@ function renderSummaryStats() {
   } else if (currentMessageType === 'dodi') {
     totalCount = allDodi.length;
   } else if (currentMessageType === 'all') {
-    // Exclude ALNAV and SECNAV from total count
-    totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allDodForms.length + allIgmcChecklists.length + allNavmcForms.length + allJtrs.length + allDodFmr.length + allDodi.length;
+    // Every connector-backed feed, matching the All view aggregation
+    totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allAlnavs.length + allSecnavs.length + allDodForms.length + allIgmcChecklists.length + allNavmcForms.length + allJtrs.length + allDodFmr.length + allDodi.length;
   }
 
   // Get date range
@@ -2078,6 +2085,9 @@ function renderSummaryStats() {
     const navmcCount = currentMessages.filter(m => m.type === 'navmc').length;
     const jtrCount = currentMessages.filter(m => m.type === 'jtr').length;
     const dodfmrCount = currentMessages.filter(m => m.type === 'dodfmr').length;
+    const alnavCount = currentMessages.filter(m => m.type === 'alnav').length;
+    const secnavCount = currentMessages.filter(m => m.type === 'secnav').length;
+    const dodiCount = currentMessages.filter(m => m.type === 'dodi').length;
     typeBreakdown = `
       <div class="stat-item">
         <span class="stat-label">MARADMIN:</span>
@@ -2086,6 +2096,18 @@ function renderSummaryStats() {
       <div class="stat-item">
         <span class="stat-label">ALMAR:</span>
         <span class="stat-value">${almarCount}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">ALNAV:</span>
+        <span class="stat-value">${alnavCount}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">SECNAV:</span>
+        <span class="stat-value">${secnavCount}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">DODI:</span>
+        <span class="stat-value">${dodiCount}</span>
       </div>
       <div class="stat-item">
         <span class="stat-label">MCPEL:</span>
