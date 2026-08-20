@@ -249,6 +249,24 @@ function effectiveDateRange(_type) {
   return currentDateRange;
 }
 
+// Human phrasing for the window in force, used wherever a filtered count is
+// shown. "Showing 5 of 500" read as a contradiction beside a four-day date
+// range: the denominator counted every record loaded, never the window the
+// filter actually applied. Naming the window removes the ambiguity.
+const DATE_RANGE_LABELS = {
+  1: 'today',
+  7: 'the last 7 days',
+  14: 'the last 14 days',
+  30: 'the last 30 days',
+  60: 'the last 60 days',
+  90: 'the last 90 days',
+  180: 'the last 180 days'
+};
+
+function dateRangeLabel(days) {
+  return DATE_RANGE_LABELS[days] || `the last ${days} days`;
+}
+
 // Keep the range buttons in sync with the range in force.
 function syncDateRangeButtons() {
   const active = effectiveDateRange(currentMessageType);
@@ -1921,9 +1939,20 @@ function updateResultsCount() {
   };
   const typeLabel = labelMap[currentMessageType] || (currentMessageType.toUpperCase() + 's');
 
-  const countText = currentMessages.length === totalCount
-    ? `Showing all ${currentMessages.length} ${typeLabel}`
-    : `Showing ${currentMessages.length} of ${totalCount} ${typeLabel}`;
+  const range = effectiveDateRange(currentMessageType);
+  const term = searchInput.value.trim();
+  let countText;
+  if (range > 0) {
+    // Under a date filter the total loaded is not the scope, so it is dropped.
+    countText = `Showing ${currentMessages.length} ${typeLabel} from ${dateRangeLabel(range)}`;
+  } else if (currentMessages.length === totalCount) {
+    countText = `Showing all ${currentMessages.length} ${typeLabel}`;
+  } else {
+    countText = `Showing ${currentMessages.length} of ${totalCount} ${typeLabel}`;
+  }
+  if (term) {
+    countText += ` matching "${term}"`;
+  }
   statusDiv.textContent = countText;
 }
 
@@ -2053,6 +2082,13 @@ function renderSummaryStats() {
     totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allAlnavs.length + allSecnavs.length + allDodForms.length + allIgmcChecklists.length + allNavmcForms.length + allJtrs.length + allDodFmr.length + allDodi.length;
   }
 
+  // Match the status line: name the window instead of a denominator the
+  // filter never applied to.
+  const summaryRange = effectiveDateRange(currentMessageType);
+  const totalShowingText = summaryRange > 0
+    ? `${currentMessages.length} from ${dateRangeLabel(summaryRange)}`
+    : `${currentMessages.length} of ${totalCount}`;
+
   // Get date range
   const dates = currentMessages.map(m => m.pubDateObj).sort((a, b) => a - b);
   const oldestDate = dates.length > 0 ? formatDate(dates[0]) : 'N/A';
@@ -2133,7 +2169,7 @@ function renderSummaryStats() {
     <div class="stats-grid ${isCollapsed ? 'collapsed' : ''}">
       <div class="stat-item">
         <span class="stat-label">Total Showing:</span>
-        <span class="stat-value">${currentMessages.length} of ${totalCount}</span>
+        <span class="stat-value">${totalShowingText}</span>
       </div>
       ${typeBreakdown}
       <div class="stat-item">
