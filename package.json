@@ -27,7 +27,7 @@
     "@fontsource/bebas-neue": "^5.3.0",
     "cheerio": "^1.1.2",
     "dompurify": "^3.4.11",
-    "web-vitals": "^6.1.0"
+    "web-vitals": "^6.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
