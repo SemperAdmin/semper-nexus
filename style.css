@@ -107,6 +107,37 @@ header.header--hidden {
   transition: height 0.2s ease;
 }
 
+/* The header logo links to the Semper Admin Portal. No link decoration, so
+   the header looks unchanged, but it stays a real focus target for keyboard
+   users rather than an image that happens to be clickable. */
+.header-logo-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.header-logo-link:hover .header-logo,
+.header-logo-link:focus-visible .header-logo {
+  opacity: 0.85;
+  transform: scale(1.04);
+}
+
+.header-logo-link:focus-visible {
+  outline: 2px solid var(--color-brass, #C8A951);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-logo-link,
+  .header-logo-link:hover .header-logo,
+  .header-logo-link:focus-visible .header-logo {
+    transition: none;
+    transform: none;
+  }
+}
+
 .header-text {
   display: flex;
   flex-direction: column;
