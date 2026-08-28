@@ -2962,6 +2962,13 @@ footer p {
   opacity: 0.8;
 }
 
+/* Court-Martial Reports type badge. Scarlet-leaning to read as distinct
+   from the blue document families beside it in the tab row. */
+.type-badge.type-cmr {
+  background: var(--color-usmc-scarlet-700, #6d1420);
+  color: var(--color-parchment, #f5f0e6);
+}
+
 /* NAVMC Form type badge */
 .type-badge.type-navmc {
   background: var(--color-marine-blue-100);

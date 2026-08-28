@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "fetch-fa": "node scripts/fetch-fa-checklists.mjs",
+    "fetch-cmr": "node scripts/fetch-court-martial.mjs",
     "fetch-secnav": "node scripts/fetch-secnav.mjs",
     "fetch-alnav": "node scripts/fetch-alnav.mjs",
     "generate-secnav": "node scripts/generate-secnav-data.mjs",

@@ -39,7 +39,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="stylesheet" href="semper-tokens.css?v=3">
-<link rel="stylesheet" href="style.css?v=32">
+<link rel="stylesheet" href="style.css?v=33">
 <link rel="stylesheet" href="ai-improvements.css?v=2">
 <script src="vendor/purify.min.js?v=3.4.13"></script>
 <script src="lib/safe-html.js?v=4"></script>
@@ -78,6 +78,7 @@
     <button class="message-type-btn" data-type="navmc" role="tab" aria-selected="false" aria-controls="results">NAVMC FORMS <span class="tab-counter" aria-label="0 messages">0</span></button>
     <button class="message-type-btn" data-type="dodi" role="tab" aria-selected="false" aria-controls="results">DODI <span class="tab-counter" aria-label="0 messages">0</span></button>
     <button class="message-type-btn" data-type="dodforms" role="tab" aria-selected="false" aria-controls="results">DD FORMS <span class="tab-counter" aria-label="0 messages">0</span></button>
+    <button class="message-type-btn" data-type="cmr" role="tab" aria-selected="false" aria-controls="results">COURT MARTIAL <span class="tab-counter" aria-label="0 messages">0</span></button>
     <a class="message-type-btn message-type-btn--external" data-type="paa" href="https://usmc.sharepoint-mil.us.mcas-gov.us/sites/dcmra_mra_mi_missa/Lists/PAA/PAA%20Gallery.aspx?viewid=b5df248c%2Dbbad%2D466e%2D987c%2D50e685dc0547" target="_blank" rel="noopener noreferrer" title="Opens the PAA list on SharePoint in a new tab. CAC sign-in required.">PAA <span class="external-icon" aria-hidden="true">&#8599;</span><span class="sr-only"> (opens external SharePoint site in new tab, CAC required)</span></a>
     <a class="message-type-btn message-type-btn--external" data-type="paan" href="https://usmc.sharepoint-mil.us.mcas-gov.us/sites/DCPR_RFF_External/Finance_Policy/SitePages/Advisory%20Notifications.aspx" target="_blank" rel="noopener noreferrer" title="Opens Advisory Notifications on SharePoint in a new tab. CAC sign-in required.">PAAN <span class="external-icon" aria-hidden="true">&#8599;</span><span class="sr-only"> (opens external SharePoint site in new tab, CAC required)</span></a>
     <a class="message-type-btn message-type-btn--external" data-type="tan" href="https://usmc.sharepoint-mil.us.mcas-gov.us/sites/DCPR_RFF_External/Finance_Policy/SitePages/Advisory%20Notifications.aspx" target="_blank" rel="noopener noreferrer" title="Opens Advisory Notifications on SharePoint in a new tab. CAC sign-in required.">TAN <span class="external-icon" aria-hidden="true">&#8599;</span><span class="sr-only"> (opens external SharePoint site in new tab, CAC required)</span></a>
@@ -136,12 +137,13 @@
 </footer>
 
 <script src="lib/fa-checklists.js"></script>
+<script src="lib/court-martial-data.js"></script>
 <script src="lib/secnav-data.js"></script>
 <script src="lib/alnav-data.js"></script>
 
 <script src="vendor/web-vitals.iife.js?v=6.1.0"></script>
 
-<script src="app.js?v=41"></script>
+<script src="app.js?v=42"></script>
 
 <!-- Service Worker Registration for PWA -->
 <script src="pwa-init.js"></script>
