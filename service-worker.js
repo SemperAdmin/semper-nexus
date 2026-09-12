@@ -3,7 +3,7 @@
 
 // Cache version - update this when deploying new versions
 // Format: v{major}.{minor}.{patch}-{timestamp}
-const CACHE_VERSION = 'v2.6.0-20260809';
+const CACHE_VERSION = 'v2.7.0-20260912';
 const CACHE_NAME = `semper-nexus-${CACHE_VERSION}`;
 
 // Assets to cache immediately on install.
