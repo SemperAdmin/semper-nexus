@@ -30,6 +30,11 @@ permissions:
 
 jobs:
   mirror:
+    # Dependabot-triggered runs never receive repository secrets, so the push
+    # step fails with "Neither GITLAB_MIRROR_TOKEN nor GITLAB_SYNC_TOKEN is set"
+    # on every dependabot branch. Those branches are mirrored by the nightly
+    # schedule and again when their PR merges to main.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
