@@ -1,12 +1,41 @@
-# FA Checklists Data Fetching Scripts
+# Static Data Fetching Scripts
 
-This directory contains scripts for fetching and updating FA Checklists data from the IGMC website.
+This directory contains scripts that fetch source data at build time and generate the static data files under `lib/`.
 
 ## Overview
 
 The FA Checklists feature uses a **build-time data generation** approach combined with **automated scheduled updates** via GitHub Actions.
 
 ## Scripts
+
+### `fetch-court-martial.mjs`
+
+Fetches the monthly General and Special Court-Martial dispositions listing from
+the Marine Corps Office of the Judge Advocate.
+
+**Source:** https://www.sja.marines.mil/Court-Martial-Reports/
+**Target:** `lib/court-martial-data.js`
+
+**Behavior:**
+- Discovers the pagination parameter (currently `smdpage162653`) from the page
+  markup rather than hard-coding it, since the number is a site-generated module
+  id that changes if SJA rebuilds the page.
+- Walks every page, matching rows by title shape (`YYYY Month`) rather than by
+  table class, so a theme change does not silently return zero rows.
+- Excludes the JAGINST enclosures and reference PDFs the same listing carries.
+- Re-encodes the media.defense.gov paths, which contain spaces and parentheses.
+- Refuses to write an empty file, and refuses a result under 80 percent of the
+  committed record count. A failed or partial scrape leaves the committed data
+  in place and exits non-zero.
+
+**Usage:**
+```bash
+npm run fetch-cmr
+```
+
+**Run this locally, not in CI.** sja.marines.mil sits behind Akamai and returns
+HTTP 403 to GitHub Actions runners and other datacenter ranges. Commit the
+regenerated `lib/court-martial-data.js` alongside your other changes.
 
 ### `fetch-fa-checklists.mjs`
 

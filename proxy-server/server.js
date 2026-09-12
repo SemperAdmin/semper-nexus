@@ -457,7 +457,11 @@ async function refreshDodiCache() {
     if (!id) return;
 
     let link = (linkEl.attr('href') || '').trim();
-    if (link.startsWith('/')) link = DODI_BASE_URL + link;
+    // Resolve any relative form (root-, protocol-, or path-relative) against
+    // the page the table came from; leave unparseable values as-is.
+    if (link) {
+      try { link = new URL(link, DODI_UPSTREAM_URL).href; } catch (e) { /* keep raw */ }
+    }
 
     const issuanceDate = cells.eq(1).text().trim();
     const subject = cells.eq(2).text().trim().replace(/\s+/g, ' ');

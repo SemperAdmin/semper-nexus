@@ -10,7 +10,8 @@ const APPLICATION_CONFIG = {
     alnav:    { subjectSource: 'subject', showDetails: true, prependIdToTitle: false, hideIdColumn: false },
     secnav:   { subjectSource: 'subject', showDetails: true, prependIdToTitle: false, hideIdColumn: false },
     jtr:      { subjectSource: 'subject', showDetails: true, prependIdToTitle: false, hideIdColumn: true },
-    dodi:     { subjectSource: 'subject', showDetails: false, prependIdToTitle: true, hideIdColumn: true }
+    dodi:     { subjectSource: 'subject', showDetails: false, prependIdToTitle: true, hideIdColumn: true },
+    cmr:      { subjectSource: 'subject', showDetails: false, prependIdToTitle: false, hideIdColumn: true }
   }
 };
 
@@ -249,6 +250,53 @@ function effectiveDateRange(_type) {
   return currentDateRange;
 }
 
+// Human phrasing for the window in force, used wherever a filtered count is
+// shown. "Showing 5 of 500" read as a contradiction beside a four-day date
+// range: the denominator counted every record loaded, never the window the
+// filter actually applied. Naming the window removes the ambiguity.
+const DATE_RANGE_LABELS = {
+  1: 'today',
+  7: 'the last 7 days',
+  14: 'the last 14 days',
+  30: 'the last 30 days',
+  60: 'the last 60 days',
+  90: 'the last 90 days',
+  180: 'the last 180 days'
+};
+
+function dateRangeLabel(days) {
+  return DATE_RANGE_LABELS[days] || `the last ${days} days`;
+}
+
+// Every connector-backed feed in one array. Matches the All Messages
+// aggregation exactly, so the denominator in the status line and the All tab
+// counter can never disagree.
+function allFeedMessages() {
+  return [
+    ...allMaradmins, ...allMcpubs, ...allAlmars, ...allAlnavs, ...allSecnavs,
+    ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs,
+    ...allDodFmr, ...allDodi, ...allCourtMartial
+  ];
+}
+
+// Count of messages surviving the filters currently in force. One
+// implementation feeds the status line, the summary card, and every tab
+// counter, so the numbers on screen are always computed the same way.
+function countInScope(messages, type) {
+  const range = effectiveDateRange(type);
+  const term = searchInput.value.toLowerCase().trim();
+  let out = messages;
+  if (range > 0) {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - range);
+    out = out.filter(m => m.pubDateObj >= cutoffDate);
+  }
+  if (term) {
+    out = out.filter(m => m.searchText.includes(term));
+  }
+  return out.length;
+}
+
 // Keep the range buttons in sync with the range in force.
 function syncDateRangeButtons() {
   const active = effectiveDateRange(currentMessageType);
@@ -317,16 +365,18 @@ let allSecnavs = []; // Store all SECNAV directives
 let allJtrs = []; // Store all JTR (Joint Travel Regulations) updates
 let allDodFmr = []; // Store all DoD FMR changes
 let allDodi = []; // DoD Issuances (DoDI scraped from esd.whs.mil)
+let allCourtMartial = []; // Court-Martial Reports (static, lib/court-martial-data.js)
 let allNavmcRaw = []; // Raw DLA DSO records backing allNavmcForms (cached verbatim)
 // Per-feed load failures, keyed by message type. Drives a visible empty state
 // so a blocked fetch reads as an error instead of an empty result set.
 const feedLoadErrors = {};
-let currentMessageType = 'maradmin'; // Track current view: 'maradmin', 'mcpub', 'alnav', 'almar', 'dodforms', 'igmc', 'secnav', 'jtr', 'dodfmr', 'dodi', or 'all'
+let currentMessageType = 'maradmin'; // Track current view: 'maradmin', 'mcpub', 'alnav', 'almar', 'dodforms', 'igmc', 'secnav', 'jtr', 'dodfmr', 'dodi', 'cmr', or 'all'
 
 // Init
 document.addEventListener("DOMContentLoaded", () => {
   loadCachedData();
   loadIgmcChecklists(); // Load IGMC Checklists from static data file
+  loadCourtMartialReports(); // Load Court-Martial Reports from static data file
   loadSecnavDirectives(); // Load SECNAV Directives from static data file (lib/secnav-data.js)
   loadAlnavMessages(); // Load ALNAV Messages from static data file (lib/alnav-data.js)
   // Note: Static files may be empty if fetch scripts failed during build
@@ -355,6 +405,7 @@ refreshBtn.addEventListener("click", () => {
   refreshBtn.disabled = true;
   setIconContent(refreshBtn, 'fa-arrows-rotate', 'Refreshing...', ['fa-spin']);
   loadIgmcChecklists(); // Reload IGMC Checklists from static data file
+  loadCourtMartialReports(); // Reload Court-Martial Reports from static data file
   loadSecnavDirectives(); // Reload SECNAV Directives from static data file
   loadAlnavMessages(); // Reload ALNAV Messages from static data file
   fetchAllFeeds().then(() => {
@@ -558,7 +609,11 @@ function parseDodiTable(doc) {
     if (!id) return;
 
     let link = (linkEl?.getAttribute('href') || '').trim();
-    if (link.startsWith('/')) link = DODI_BASE_URL + link;
+    // Resolve any relative form (root-, protocol-, or path-relative) against
+    // the page the table came from; leave unparseable values as-is.
+    if (link) {
+      try { link = new URL(link, DODI_URL).href; } catch (e) { /* keep raw */ }
+    }
 
     items.push({
       id,
@@ -847,6 +902,20 @@ async function fetchDodFormsPage(url) {
   }
 }
 
+// Rewrite a DoD form link whose host was mistakenly resolved against the app's
+// own origin (e.g. https://nexus.app.cloud.gov/Directives/forms/...) back to
+// the esd.whs.mil source. Leaves every other link untouched.
+function repairDodFormLink(link) {
+  if (typeof link !== 'string') {return link;}
+  try {
+    const u = new URL(link);
+    if (u.hostname !== 'www.esd.whs.mil' && u.pathname.startsWith('/Directives/forms/')) {
+      return 'https://www.esd.whs.mil' + u.pathname + u.search + u.hash;
+    }
+  } catch (e) { /* not an absolute URL; leave as-is */ }
+  return link;
+}
+
 // Parse DoD Forms table from HTML document
 function parseDodFormsTable(doc, sourceUrl) {
   const forms = [];
@@ -887,7 +956,9 @@ function parseDodFormsTable(doc, sourceUrl) {
       const form = {
         id: number,
         subject: title,
-        link: linkElem ? new URL(linkElem.href, sourceUrl).href : sourceUrl,
+        // Use the raw href attribute: DOMParser documents resolve .href against
+        // the app's own origin, not the page the HTML came from.
+        link: linkElem && linkElem.getAttribute('href') ? new URL(linkElem.getAttribute('href'), sourceUrl).href : sourceUrl,
         pubDate: pubDate,
         pubDateObj: pubDateObj,
         type: 'dodforms',
@@ -1441,6 +1512,69 @@ function loadIgmcChecklists() {
   }
 }
 
+// Load Court-Martial Reports from the static data file generated by
+// scripts/fetch-court-martial.mjs. Same shape as the FA checklist loader: no
+// network call at runtime, so this tab renders even with the proxy down.
+function loadCourtMartialReports() {
+  try {
+    if (typeof window.COURT_MARTIAL_REPORTS === 'undefined' || !Array.isArray(window.COURT_MARTIAL_REPORTS)) {
+      console.warn('COURT_MARTIAL_REPORTS data not found or invalid');
+      allCourtMartial = [];
+      return;
+    }
+
+    const sourceUrl = window.COURT_MARTIAL_META?.sourceUrl || 'https://www.sja.marines.mil/Court-Martial-Reports/';
+
+    allCourtMartial = window.COURT_MARTIAL_REPORTS.map(report => {
+      // publicationDate is M/D/YYYY. Fall back to the first of the report month
+      // so a malformed date never lands the record on today and pins it to the
+      // top of a newest-first sort.
+      const parsed = new Date(report.publicationDate);
+      const fallback = new Date(`${report.period}-01T00:00:00Z`);
+      const pubDateObj = isNaN(parsed.getTime())
+        ? (isNaN(fallback.getTime()) ? new Date(0) : fallback)
+        : parsed;
+
+      const subject = `${report.title} Court-Martial Dispositions`;
+      const searchText = `${report.title} ${report.reportMonth} ${report.reportYear} court martial dispositions general special ${report.description}`.toLowerCase();
+
+      return {
+        id: report.title,
+        numericId: report.period,
+        subject: subject,
+        title: report.title,
+        // Deep link to the month's PDF. The listing page is the fallback when a
+        // record carries no href.
+        link: report.url || sourceUrl,
+        pubDate: pubDateObj.toISOString(),
+        pubDateObj: pubDateObj,
+        summary: report.description,
+        description: `${report.description}. Reporting period ${report.reportMonth} ${report.reportYear}. Published ${report.publicationDate}.`,
+        category: 'Court-Martial Dispositions',
+        type: 'cmr',
+        searchText: searchText,
+        // filterMessages assumes searchTokens exists on every message.
+        searchTokens: searchText.split(/\s+/).filter(token => token.length > 2),
+        detailsFetched: true,
+        maradminNumber: null,
+        courtMartialReport: report
+      };
+    });
+
+    allCourtMartial.sort((a, b) => b.pubDateObj - a.pubDateObj);
+    console.log(`Loaded ${allCourtMartial.length} Court-Martial Reports`);
+
+    if (window.COURT_MARTIAL_META) {
+      console.log('[CMR] Source:', window.COURT_MARTIAL_META.sourceUrl);
+      console.log('[CMR] Coverage:', window.COURT_MARTIAL_META.coverage);
+    }
+  } catch (error) {
+    ErrorAnalytics.track('loadCourtMartialReports', error, { source: 'lib/court-martial-data.js' });
+    console.error('Error loading Court-Martial Reports:', error);
+    allCourtMartial = [];
+  }
+}
+
 // Load SECNAV Directives from static data file
 function loadSecnavDirectives() {
   allSecnavs = loadStaticData({
@@ -1762,10 +1896,12 @@ function filterMessages() {
     allMessages = [...allNavmcForms];
   } else if (currentMessageType === 'dodi') {
     allMessages = [...allDodi];
+  } else if (currentMessageType === 'cmr') {
+    allMessages = [...allCourtMartial];
   } else if (currentMessageType === 'all') {
     // Every connector-backed feed, ALNAV and SECNAV included. Only the
     // SharePoint link tabs (PAA/PAAN/TAN/FAN/ICAN) have no data to add.
-    allMessages = [...allMaradmins, ...allMcpubs, ...allAlmars, ...allAlnavs, ...allSecnavs, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi];
+    allMessages = allFeedMessages();
     allMessages.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
   }
 
@@ -1889,68 +2025,39 @@ function startAutoRefresh() {
 }
 
 function updateResultsCount() {
-  let totalCount = 0;
-  if (currentMessageType === 'maradmin') {
-    totalCount = allMaradmins.length;
-  } else if (currentMessageType === 'mcpub') {
-    totalCount = allMcpubs.length;
-  } else if (currentMessageType === 'alnav') {
-    totalCount = allAlnavs.length;
-  } else if (currentMessageType === 'almar') {
-    totalCount = allAlmars.length;
-  } else if (currentMessageType === 'dodforms') {
-    totalCount = allDodForms.length;
-  } else if (currentMessageType === 'navmc') {
-    totalCount = allNavmcForms.length;
-  } else if (currentMessageType === 'dodi') {
-    totalCount = allDodi.length;
-  } else if (currentMessageType === 'all') {
-    // Every connector-backed feed, matching the All view aggregation
-    totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allAlnavs.length + allSecnavs.length + allDodForms.length + allIgmcChecklists.length + allNavmcForms.length + allJtrs.length + allDodFmr.length + allDodi.length;
+  const range = effectiveDateRange(currentMessageType);
+  const term = searchInput.value.trim();
+  // Denominator is every message in scope, not every message loaded. Against
+  // the old "17 of 500", the 500 counted records the active filter had already
+  // excluded, so the line contradicted the date range printed beneath it.
+  const scopeTotal = countInScope(allFeedMessages(), 'all');
+
+  let countText;
+  if (scopeTotal === 0) {
+    // "Showing all 0" reads as a boast about nothing.
+    countText = `Showing 0 messages`;
+  } else if (currentMessages.length === scopeTotal) {
+    countText = `Showing all ${scopeTotal} messages`;
+  } else {
+    countText = `Showing ${currentMessages.length} of ${scopeTotal} messages`;
   }
-
-  const labelMap = {
-    all: 'Messages',
-    dodforms: 'DD Forms',
-    igmc: 'FA Checklists',
-    navmc: 'NAVMC Forms',
-    mcpub: 'MCPEL Items',
-    jtr: 'DTMO Updates',
-    dodfmr: 'DODFMR Changes',
-    dodi: 'DoD Issuances'
-  };
-  const typeLabel = labelMap[currentMessageType] || (currentMessageType.toUpperCase() + 's');
-
-  const countText = currentMessages.length === totalCount
-    ? `Showing all ${currentMessages.length} ${typeLabel}`
-    : `Showing ${currentMessages.length} of ${totalCount} ${typeLabel}`;
+  if (range > 0) {
+    countText += ` from ${dateRangeLabel(range)}`;
+  }
+  if (term) {
+    countText += ` matching "${term}"`;
+  }
   statusDiv.textContent = countText;
 }
 
 // Update tab counters with filtered message counts
 function updateTabCounters() {
-  const searchTerm = searchInput.value.toLowerCase().trim();
 
   // Helper function to get filtered count for a type. The range is resolved
   // per type, so an exempt tab reports its full catalog rather than the
   // handful of entries inside the default window.
   function getFilteredCount(messages, type) {
-    let filtered = messages;
-    const dateRange = effectiveDateRange(type);
-
-    // Apply date filter uniformly, matching filterMessages
-    if (dateRange > 0) {
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - dateRange);
-      filtered = filtered.filter(m => m.pubDateObj >= cutoffDate);
-    }
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(m => m.searchText.includes(searchTerm));
-    }
-
-    return filtered.length;
+    return countInScope(messages, type);
   }
 
   // Update each tab with its count
@@ -1983,6 +2090,10 @@ function updateTabCounters() {
       case 'igmc':
         count = getFilteredCount(allIgmcChecklists, type);
         baseText = 'FA CHECKLISTS';
+        break;
+      case 'cmr':
+        count = getFilteredCount(allCourtMartial, type);
+        baseText = 'COURT MARTIAL';
         break;
       case 'navmc':
         count = getFilteredCount(allNavmcForms, type);
@@ -2025,33 +2136,8 @@ function updateTabCounters() {
 
 // Render summary statistics panel
 function renderSummaryStats() {
-  let totalCount = 0;
-  if (currentMessageType === 'maradmin') {
-    totalCount = allMaradmins.length;
-  } else if (currentMessageType === 'mcpub') {
-    totalCount = allMcpubs.length;
-  } else if (currentMessageType === 'alnav') {
-    totalCount = allAlnavs.length;
-  } else if (currentMessageType === 'almar') {
-    totalCount = allAlmars.length;
-  } else if (currentMessageType === 'dodforms') {
-    totalCount = allDodForms.length;
-  } else if (currentMessageType === 'igmc') {
-    totalCount = allIgmcChecklists.length;
-  } else if (currentMessageType === 'navmc') {
-    totalCount = allNavmcForms.length;
-  } else if (currentMessageType === 'secnav') {
-    totalCount = allSecnavs.length;
-  } else if (currentMessageType === 'jtr') {
-    totalCount = allJtrs.length;
-  } else if (currentMessageType === 'dodfmr') {
-    totalCount = allDodFmr.length;
-  } else if (currentMessageType === 'dodi') {
-    totalCount = allDodi.length;
-  } else if (currentMessageType === 'all') {
-    // Every connector-backed feed, matching the All view aggregation
-    totalCount = allMaradmins.length + allMcpubs.length + allAlmars.length + allAlnavs.length + allSecnavs.length + allDodForms.length + allIgmcChecklists.length + allNavmcForms.length + allJtrs.length + allDodFmr.length + allDodi.length;
-  }
+  // Same denominator as the status line: messages in scope, not loaded.
+  const totalShowingText = `${currentMessages.length} of ${countInScope(allFeedMessages(), 'all')}`;
 
   // Get date range
   const dates = currentMessages.map(m => m.pubDateObj).sort((a, b) => a - b);
@@ -2133,7 +2219,7 @@ function renderSummaryStats() {
     <div class="stats-grid ${isCollapsed ? 'collapsed' : ''}">
       <div class="stat-item">
         <span class="stat-label">Total Showing:</span>
-        <span class="stat-value">${currentMessages.length} of ${totalCount}</span>
+        <span class="stat-value">${totalShowingText}</span>
       </div>
       ${typeBreakdown}
       <div class="stat-item">
@@ -2241,6 +2327,7 @@ function renderCompactView(arr) {
       'dodfmr':   'DODFMR',
       'igmc':     'FA CHECKLIST',
       'navmc':    'NAVMC FORM',
+      'cmr':      'COURT MARTIAL',
       'dodi':     'DODI'
     };
     const typeLabel = typeLabels[item.type] || item.type.toUpperCase();
@@ -2713,6 +2800,9 @@ function loadCachedData() {
       allDodForms = JSON.parse(dodFormsCache);
       allDodForms = allDodForms.map(m => ({
         ...m,
+        // Repair links cached before the DOMParser href fix: they were resolved
+        // against the app's own origin instead of esd.whs.mil.
+        link: repairDodFormLink(m.link),
         pubDateObj: new Date(m.pubDate)
       }));
     }
