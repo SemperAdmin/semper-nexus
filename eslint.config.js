@@ -12,6 +12,7 @@ export default [
       'build/',
       'coverage/',
       '**/*.min.js',
+      'vendor/',
       'lib/',
       'proxy-server/node_modules/',
       '.github/',
