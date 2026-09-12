@@ -609,7 +609,11 @@ function parseDodiTable(doc) {
     if (!id) return;
 
     let link = (linkEl?.getAttribute('href') || '').trim();
-    if (link.startsWith('/')) link = DODI_BASE_URL + link;
+    // Resolve any relative form (root-, protocol-, or path-relative) against
+    // the page the table came from; leave unparseable values as-is.
+    if (link) {
+      try { link = new URL(link, DODI_URL).href; } catch (e) { /* keep raw */ }
+    }
 
     items.push({
       id,
