@@ -898,6 +898,20 @@ async function fetchDodFormsPage(url) {
   }
 }
 
+// Rewrite a DoD form link whose host was mistakenly resolved against the app's
+// own origin (e.g. https://nexus.app.cloud.gov/Directives/forms/...) back to
+// the esd.whs.mil source. Leaves every other link untouched.
+function repairDodFormLink(link) {
+  if (typeof link !== 'string') {return link;}
+  try {
+    const u = new URL(link);
+    if (u.hostname !== 'www.esd.whs.mil' && u.pathname.startsWith('/Directives/forms/')) {
+      return 'https://www.esd.whs.mil' + u.pathname + u.search + u.hash;
+    }
+  } catch (e) { /* not an absolute URL; leave as-is */ }
+  return link;
+}
+
 // Parse DoD Forms table from HTML document
 function parseDodFormsTable(doc, sourceUrl) {
   const forms = [];
@@ -938,7 +952,9 @@ function parseDodFormsTable(doc, sourceUrl) {
       const form = {
         id: number,
         subject: title,
-        link: linkElem ? new URL(linkElem.href, sourceUrl).href : sourceUrl,
+        // Use the raw href attribute: DOMParser documents resolve .href against
+        // the app's own origin, not the page the HTML came from.
+        link: linkElem && linkElem.getAttribute('href') ? new URL(linkElem.getAttribute('href'), sourceUrl).href : sourceUrl,
         pubDate: pubDate,
         pubDateObj: pubDateObj,
         type: 'dodforms',
@@ -2780,6 +2796,9 @@ function loadCachedData() {
       allDodForms = JSON.parse(dodFormsCache);
       allDodForms = allDodForms.map(m => ({
         ...m,
+        // Repair links cached before the DOMParser href fix: they were resolved
+        // against the app's own origin instead of esd.whs.mil.
+        link: repairDodFormLink(m.link),
         pubDateObj: new Date(m.pubDate)
       }));
     }
