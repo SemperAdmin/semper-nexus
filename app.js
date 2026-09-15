@@ -179,16 +179,12 @@ function getDodFmrUrls() {
   return ['https://comptroller.war.gov/FMR/change.aspx'];
 }
 
-// DoD Forms URLs
-const DOD_FORMS_URLS = [
-  "https://www.esd.whs.mil/Directives/forms/dd0001_0499/",
-  "https://www.esd.whs.mil/Directives/forms/dd0500_0999/",
-  "https://www.esd.whs.mil/Directives/forms/dd1000_1499/",
-  "https://www.esd.whs.mil/Directives/forms/dd1500_1999/",
-  "https://www.esd.whs.mil/Directives/forms/dd2000_2499/",
-  "https://www.esd.whs.mil/Directives/forms/dd2500_2999/",
-  "https://www.esd.whs.mil/Directives/forms/dd3000_3499/"
-];
+// DD Forms and DoD Issuances (DoDI) are static types since 15 Sep 2026:
+// lib/dd-forms-data.js and lib/dodi-data.js, refreshed from a workstation by
+// npm run fetch-dd-forms and npm run fetch-dodi. The runtime fetch from
+// esd.whs.mil failed for every user: the site sends no CORS header, the Render
+// proxy's domain allowlist excludes esd.whs.mil, and Akamai returns 403 to
+// datacenter ranges. See scripts/fetch-dodi.mjs.
 
 // Custom Proxy Server Configuration
 // Set this to your deployed proxy server URL to bypass CORS issues
@@ -358,13 +354,13 @@ let allMaradmins = []; // Store all MARADMINs
 let allMcpubs = []; // Store all MCPEL items (internal type 'mcpub' preserved for legacy compatibility)
 let allAlnavs = []; // Store all ALNAVs
 let allAlmars = []; // Store all ALMARs
-let allDodForms = []; // Store all DoD Forms
+let allDodForms = []; // DD Forms (static, lib/dd-forms-data.js)
 let allIgmcChecklists = []; // FA Checklists (loaded from lib/fa-checklists.js; legacy variable name preserved)
 let allNavmcForms = []; // NAVMC Forms
 let allSecnavs = []; // Store all SECNAV directives
 let allJtrs = []; // Store all JTR (Joint Travel Regulations) updates
 let allDodFmr = []; // Store all DoD FMR changes
-let allDodi = []; // DoD Issuances (DoDI scraped from esd.whs.mil)
+let allDodi = []; // DoD Issuances (static, lib/dodi-data.js)
 let allCourtMartial = []; // Court-Martial Reports (static, lib/court-martial-data.js)
 let allNavmcRaw = []; // Raw DLA DSO records backing allNavmcForms (cached verbatim)
 // Per-feed load failures, keyed by message type. Drives a visible empty state
@@ -377,6 +373,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadCachedData();
   loadIgmcChecklists(); // Load IGMC Checklists from static data file
   loadCourtMartialReports(); // Load Court-Martial Reports from static data file
+  loadDodIssuances(); // Load DoD Issuances from static data file (lib/dodi-data.js)
+  loadDdForms(); // Load DD Forms from static data file (lib/dd-forms-data.js)
   loadSecnavDirectives(); // Load SECNAV Directives from static data file (lib/secnav-data.js)
   loadAlnavMessages(); // Load ALNAV Messages from static data file (lib/alnav-data.js)
   // Note: Static files may be empty if fetch scripts failed during build
@@ -406,6 +404,8 @@ refreshBtn.addEventListener("click", () => {
   setIconContent(refreshBtn, 'fa-arrows-rotate', 'Refreshing...', ['fa-spin']);
   loadIgmcChecklists(); // Reload IGMC Checklists from static data file
   loadCourtMartialReports(); // Reload Court-Martial Reports from static data file
+  loadDodIssuances(); // Reload DoD Issuances from static data file
+  loadDdForms(); // Reload DD Forms from static data file
   loadSecnavDirectives(); // Reload SECNAV Directives from static data file
   loadAlnavMessages(); // Reload ALNAV Messages from static data file
   fetchAllFeeds().then(() => {
@@ -484,10 +484,8 @@ async function fetchAllFeeds() {
     ['almar', () => fetchFeed('almar', RSS_FEEDS.almar)],
     ['secnav', () => fetchFeed('secnav', RSS_FEEDS.secnav)],
     ['jtr', () => fetchFeed('jtr', RSS_FEEDS.jtr)],
-    ['dodforms', () => fetchDodForms()],
     ['dodfmr', () => fetchDodFmrChanges()],
-    ['navmc', () => fetchNavmcForms()],
-    ['dodi', () => fetchDodi()]
+    ['navmc', () => fetchNavmcForms()]
   ];
 
   const results = await Promise.allSettled(feedTasks.map(([, run]) => run()));
@@ -547,7 +545,7 @@ function mapNavmcRecord(f) {
   // Missing creationDate previously fell back to the current timestamp, which
   // stamped undated forms with today's date and pinned them to the top of the
   // newest-first sort permanently. Fall back to lastRevisionDate, then to
-  // epoch, matching how fetchDodi treats unparseable dates.
+  // epoch, matching how loadDodIssuances treats unparseable dates.
   const rawDate = f.creationDate || f.lastRevisionDate || '';
   const parsedDate = rawDate ? new Date(rawDate) : new Date(0);
   const safeDateObj = isNaN(parsedDate.getTime()) ? new Date(0) : parsedDate;
@@ -584,114 +582,6 @@ function mapNavmcRecord(f) {
     detailsFetched: true,
     maradminNumber: null
   };
-}
-
-// Fetch DoD Issuances (DoDI) directly from esd.whs.mil. Same site as DD
-// Forms and same CORS pattern: try browser fetch first, fall back to
-// proxy. Parse the DNN ASP.NET table client-side with DOMParser, then
-// shape items the same way the proxy used to.
-const DODI_URL = 'https://www.esd.whs.mil/Directives/issuances/dodi/';
-const DODI_BASE_URL = 'https://www.esd.whs.mil';
-
-// Parse the DNN UserDefinedTable that drives the DoDI issuances page.
-// Each issuance row carries class dnnGridItem or dnnGridAltItem.
-// Cells in order: Issuance #, Issuance Date, Subject, CH #, CH Date,
-// Related Memo, OPR.
-function parseDodiTable(doc) {
-  const items = [];
-  const rows = doc.querySelectorAll('tr.dnnGridItem, tr.dnnGridAltItem');
-  rows.forEach(row => {
-    const cells = row.querySelectorAll(':scope > td');
-    if (cells.length < 7) return;
-
-    const linkEl = cells[0].querySelector('a');
-    const id = ((linkEl?.textContent || cells[0].textContent) || '').trim().replace(/\s+/g, ' ');
-    if (!id) return;
-
-    let link = (linkEl?.getAttribute('href') || '').trim();
-    // Resolve any relative form (root-, protocol-, or path-relative) against
-    // the page the table came from; leave unparseable values as-is.
-    if (link) {
-      try { link = new URL(link, DODI_URL).href; } catch (e) { /* keep raw */ }
-    }
-
-    items.push({
-      id,
-      link,
-      issuanceDate: cells[1].textContent.trim(),
-      subject: cells[2].textContent.trim().replace(/\s+/g, ' '),
-      chNumber: cells[3].textContent.trim().replace(/\s+/g, ' '),
-      chDate: cells[4].textContent.trim(),
-      relatedMemo: cells[5].textContent.trim().replace(/\s+/g, ' '),
-      opr: cells[6].textContent.trim().replace(/\s+/g, ' ')
-    });
-  });
-  console.log(`[DODI] Parsed ${items.length} rows from DNN table`);
-  return items;
-}
-
-async function fetchDodi() {
-  console.log('[DODI] Fetching DoD Issuances from esd.whs.mil...');
-  try {
-    let html = await tryDirectFetch(DODI_URL).catch(() => null);
-    if (!html) {
-      console.warn('[DODI] Direct fetch failed, trying proxy fallback');
-      html = await fetchViaCustomProxy(DODI_URL);
-    }
-    if (!html) {
-      throw new Error('All DoDI fetch attempts failed');
-    }
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const items = parseDodiTable(doc);
-    allDodi = items.map(d => {
-      // esd.whs.mil ships M/D/YYYY. Parse, then normalize to ISO so the date
-      // filter and sort match every other message type. Invalid dates fall
-      // back to epoch and sort to the bottom.
-      const rawDate = d.issuanceDate || '';
-      const parsedDate = rawDate ? new Date(rawDate) : new Date(0);
-      const safeDateObj = isNaN(parsedDate.getTime()) ? new Date(0) : parsedDate;
-      const pubDate = safeDateObj.toISOString();
-      const id = d.id || '';
-      const subject = (d.subject || '').replace(/<[^>]+>/g, '').trim() || id;
-      const chSuffix = d.chNumber && d.chDate ? ` (${d.chNumber} ${d.chDate})` : '';
-      const searchText = `${id} ${subject} ${d.opr || ''} ${d.relatedMemo || ''}`.toLowerCase();
-      // Pre-tokenize for multi-word search. filterMessages assumes
-      // searchTokens exists on every message.
-      const searchTokens = searchText.split(/\s+/).filter(token => token.length > 2);
-      return {
-        id: id,
-        numericId: id,
-        subject: subject,
-        title: id,
-        link: d.link || 'https://www.esd.whs.mil/Directives/issuances/dodi/',
-        pubDate: pubDate,
-        pubDateObj: safeDateObj,
-        summary: `${d.opr || ''}${chSuffix}`.trim(),
-        description: `OPR ${d.opr || 'n/a'}. ${d.chNumber ? 'Change ' + d.chNumber + ' on ' + d.chDate + '. ' : ''}${d.relatedMemo ? 'Related memo ' + d.relatedMemo + '.' : ''}`.trim(),
-        category: 'DoD Issuance',
-        type: 'dodi',
-        searchText: searchText,
-        searchTokens: searchTokens,
-        detailsFetched: true,
-        maradminNumber: null
-      };
-    });
-    // Sort newest issuance first when date is parseable, then by id.
-    allDodi.sort((a, b) => {
-      const diff = b.pubDateObj - a.pubDateObj;
-      if (!isNaN(diff) && diff !== 0) return diff;
-      return a.id.localeCompare(b.id);
-    });
-    delete feedLoadErrors.dodi;
-    console.log(`[DODI] Loaded ${allDodi.length} DoD Issuances`);
-    cacheData();
-  } catch (error) {
-    ErrorAnalytics.track('fetchDodi', error, { source: 'esd.whs.mil via proxy' });
-    console.error('[DODI] Failed:', error.message);
-    feedLoadErrors.dodi = error.message || 'Unknown error';
-  }
 }
 
 // Fetch a specific RSS feed
@@ -816,165 +706,6 @@ function processRSSData(text, type) {
 
   cacheData();
   console.log(`Loaded ${parsed.length} ${type.toUpperCase()}s`);
-}
-
-// Fetch and parse DoD Forms from all pages
-async function fetchDodForms() {
-  console.log('Fetching DoD Forms from 7 pages...');
-
-  try {
-    const allForms = [];
-
-    // Fetch all pages in parallel
-    const promises = DOD_FORMS_URLS.map(url => fetchDodFormsPage(url));
-    const results = await Promise.allSettled(promises);
-
-    // Collect all successful results
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled' && result.value) {
-        allForms.push(...result.value);
-        console.log(`Loaded ${result.value.length} forms from page ${index + 1}`);
-      } else {
-        console.error(`Failed to load page ${index + 1}:`, result.reason);
-      }
-    });
-
-    // Remove duplicates based on form number
-    const uniqueForms = [];
-    const seen = new Set();
-    for (const form of allForms) {
-      if (!seen.has(form.id)) {
-        seen.add(form.id);
-        uniqueForms.push(form);
-      }
-    }
-
-    // Sort by form number
-    uniqueForms.sort((a, b) => {
-      const numA = parseInt(a.id.replace(/\D/g, '')) || 0;
-      const numB = parseInt(b.id.replace(/\D/g, '')) || 0;
-      return numA - numB;
-    });
-
-    allDodForms = uniqueForms;
-    cacheData();
-    console.log(`Total DoD Forms loaded: ${allDodForms.length}`);
-  } catch (error) {
-    ErrorAnalytics.track('fetchDodForms', error, { source: 'DoD Forms' });
-  }
-}
-
-// Helper: fetch a URL through the Render proxy server
-async function fetchViaCustomProxy(targetUrl) {
-  if (!CUSTOM_PROXY_URL) {return null;}
-  try {
-    const proxyUrl = `${CUSTOM_PROXY_URL}/api/proxy?url=${encodeURIComponent(targetUrl)}`;
-    const response = await Promise.race([
-      fetch(proxyUrl),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Render proxy timeout')), 15000))
-    ]);
-    if (response.ok) {return await response.text();}
-    return null;
-  } catch (err) {
-    console.log(`Render proxy fetch failed for ${targetUrl}:`, err.message);
-    return null;
-  }
-}
-
-// Fetch and parse a single DoD Forms page
-async function fetchDodFormsPage(url) {
-  try {
-    let text = await tryDirectFetch(url).catch(() => null);
-    if (!text) {text = await fetchViaCustomProxy(url);}
-
-    if (!text) {
-      throw new Error('All fetch attempts failed');
-    }
-
-    // Parse the HTML
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(text, 'text/html');
-
-    return parseDodFormsTable(doc, url);
-  } catch (error) {
-    console.error(`Error fetching DoD Forms page ${url}:`, error);
-    return [];
-  }
-}
-
-// Rewrite a DoD form link whose host was mistakenly resolved against the app's
-// own origin (e.g. https://nexus.app.cloud.gov/Directives/forms/...) back to
-// the esd.whs.mil source. Leaves every other link untouched.
-function repairDodFormLink(link) {
-  if (typeof link !== 'string') {return link;}
-  try {
-    const u = new URL(link);
-    if (u.hostname !== 'www.esd.whs.mil' && u.pathname.startsWith('/Directives/forms/')) {
-      return 'https://www.esd.whs.mil' + u.pathname + u.search + u.hash;
-    }
-  } catch (e) { /* not an absolute URL; leave as-is */ }
-  return link;
-}
-
-// Parse DoD Forms table from HTML document
-function parseDodFormsTable(doc, sourceUrl) {
-  const forms = [];
-
-  // Find table rows (skip header row)
-  const rows = Array.from(doc.querySelectorAll('table tbody tr'));
-
-  rows.forEach(row => {
-    try {
-      const cells = row.querySelectorAll('td');
-      if (cells.length < 5) {return;}
-
-      const linkElem = row.querySelector('a');
-      const number = cells[0]?.textContent.trim() || '';
-      const title = cells[1]?.textContent.trim() || '';
-      const edition = cells[2]?.textContent.trim() || '';
-      const controlled = cells[3]?.textContent.trim() || '';
-      const opr = cells[4]?.textContent.trim() || '';
-
-      if (!number) {return;}
-
-      // Parse date from edition field
-      let pubDate = new Date();
-      let pubDateObj = new Date();
-      if (edition) {
-        try {
-          pubDateObj = new Date(edition);
-          if (isNaN(pubDateObj.getTime())) {
-            pubDateObj = new Date();
-          }
-          pubDate = pubDateObj.toISOString();
-        } catch (e) {
-          pubDate = new Date().toISOString();
-          pubDateObj = new Date();
-        }
-      }
-
-      const form = {
-        id: number,
-        subject: title,
-        // Use the raw href attribute: DOMParser documents resolve .href against
-        // the app's own origin, not the page the HTML came from.
-        link: linkElem && linkElem.getAttribute('href') ? new URL(linkElem.getAttribute('href'), sourceUrl).href : sourceUrl,
-        pubDate: pubDate,
-        pubDateObj: pubDateObj,
-        type: 'dodforms',
-        edition: edition,
-        controlled: controlled,
-        opr: opr,
-        searchText: `${number} ${title} ${opr} ${controlled}`.toLowerCase()
-      };
-
-      forms.push(form);
-    } catch (error) {
-      console.error('Error parsing DoD Forms row:', error);
-    }
-  });
-
-  return forms;
 }
 
 // Fetch and parse ALNAV messages from Navy website
@@ -1575,6 +1306,109 @@ function loadCourtMartialReports() {
   }
 }
 
+// Load DoD Issuances (DoDI) from the static data file generated by
+// scripts/fetch-dodi.mjs. No network call at runtime. An empty or missing file
+// registers as a feed failure so the tab reads "failed to load", never "no
+// messages found": zero here means the workstation fetch has not run yet.
+function loadDodIssuances() {
+  const source = 'lib/dodi-data.js';
+  try {
+    const rows = Array.isArray(window.DODI_ISSUANCES) ? window.DODI_ISSUANCES : null;
+    if (!rows || rows.length === 0) {
+      allDodi = [];
+      feedLoadErrors.dodi = `Static data file ${source} is ${rows ? 'empty' : 'missing'}. Run npm run fetch-dodi from a workstation and redeploy.`;
+      console.warn('[DODI]', feedLoadErrors.dodi);
+      return;
+    }
+    allDodi = rows.map(d => {
+      // esd.whs.mil ships M/D/YYYY. Normalize to ISO so the date filter and
+      // sort match every other type. Invalid dates fall to epoch and sort last.
+      const parsed = d.issuanceDate ? new Date(d.issuanceDate) : new Date(0);
+      const pubDateObj = isNaN(parsed.getTime()) ? new Date(0) : parsed;
+      const id = d.id || '';
+      // Multi-volume issuances (DoDI 1402.03 has five, 5154.31 has six) share
+      // one id and often one subject; only the PDF filename carries the volume.
+      // Surface it so five identical-looking cards read as five documents.
+      const volMatch = /vol(?:ume)?[_-]?0*(\d+)/i.exec(d.link || '');
+      const volSuffix = volMatch && !/vol/i.test(d.subject || '') ? ` (Volume ${volMatch[1]})` : '';
+      const subject = ((d.subject || '').trim() || id) + volSuffix;
+      const chSuffix = d.chNumber && d.chDate ? ` (${d.chNumber} ${d.chDate})` : '';
+      const searchText = `${id} ${subject} ${d.opr || ''} ${d.relatedMemo || ''}`.toLowerCase();
+      return {
+        id,
+        numericId: id,
+        subject,
+        title: id,
+        link: d.link || window.DODI_META?.sourceUrl || 'https://www.esd.whs.mil/Directives/issuances/dodi/',
+        pubDate: pubDateObj.toISOString(),
+        pubDateObj,
+        summary: `${d.opr || ''}${chSuffix}`.trim(),
+        description: `OPR ${d.opr || 'n/a'}. ${d.chNumber ? 'Change ' + d.chNumber + ' on ' + d.chDate + '. ' : ''}${d.relatedMemo ? 'Related memo ' + d.relatedMemo + '.' : ''}`.trim(),
+        category: 'DoD Issuance',
+        type: 'dodi',
+        searchText,
+        // filterMessages assumes searchTokens exists on every message.
+        searchTokens: searchText.split(/\s+/).filter(token => token.length > 2),
+        detailsFetched: true,
+        maradminNumber: null
+      };
+    });
+    allDodi.sort((a, b) => (b.pubDateObj - a.pubDateObj) || a.id.localeCompare(b.id));
+    delete feedLoadErrors.dodi;
+    console.log(`Loaded ${allDodi.length} DoD Issuances from ${source}`);
+  } catch (error) {
+    ErrorAnalytics.track('loadDodIssuances', error, { source });
+    console.error('Error loading DoD Issuances:', error);
+    allDodi = [];
+    feedLoadErrors.dodi = error.message || 'Unknown error';
+  }
+}
+
+// Load DD Forms from the static data file generated by
+// scripts/fetch-dd-forms.mjs. Same contract as loadDodIssuances.
+function loadDdForms() {
+  const source = 'lib/dd-forms-data.js';
+  try {
+    const rows = Array.isArray(window.DD_FORMS) ? window.DD_FORMS : null;
+    if (!rows || rows.length === 0) {
+      allDodForms = [];
+      feedLoadErrors.dodforms = `Static data file ${source} is ${rows ? 'empty' : 'missing'}. Run npm run fetch-dd-forms from a workstation and redeploy.`;
+      console.warn('[DD Forms]', feedLoadErrors.dodforms);
+      return;
+    }
+    allDodForms = rows.map(f => {
+      // Edition dates arrive as M/D/YYYY or M/YYYY. V8 rejects M/YYYY, so it
+      // is read as the first of that month. Anything else unparseable falls
+      // to epoch rather than today, so it never pins itself to the top.
+      const edition = (f.edition || '').trim();
+      const monthOnly = /^(\d{1,2})\/(\d{4})$/.exec(edition);
+      const parsed = monthOnly ? new Date(`${monthOnly[1]}/1/${monthOnly[2]}`) : (edition ? new Date(edition) : new Date(0));
+      const pubDateObj = isNaN(parsed.getTime()) ? new Date(0) : parsed;
+      const searchText = `${f.id} ${f.title} ${f.opr || ''} ${f.controlled || ''}`.toLowerCase();
+      return {
+        id: f.id,
+        subject: f.title,
+        link: f.link || f.sourcePage || window.DD_FORMS_META?.sourceUrl || 'https://www.esd.whs.mil/Directives/forms/',
+        pubDate: pubDateObj.toISOString(),
+        pubDateObj,
+        type: 'dodforms',
+        edition: f.edition,
+        controlled: f.controlled,
+        opr: f.opr,
+        searchText,
+        searchTokens: searchText.split(/\s+/).filter(token => token.length > 2)
+      };
+    });
+    delete feedLoadErrors.dodforms;
+    console.log(`Loaded ${allDodForms.length} DD Forms from ${source}`);
+  } catch (error) {
+    ErrorAnalytics.track('loadDdForms', error, { source });
+    console.error('Error loading DD Forms:', error);
+    allDodForms = [];
+    feedLoadErrors.dodforms = error.message || 'Unknown error';
+  }
+}
+
 // Load SECNAV Directives from static data file
 function loadSecnavDirectives() {
   allSecnavs = loadStaticData({
@@ -2123,8 +1957,9 @@ function updateTabCounters() {
         // External SharePoint links - leave anchor content untouched
         return;
       case 'all':
-        // Every connector-backed feed, matching the All view aggregation
-        count = getFilteredCount([...allMaradmins, ...allMcpubs, ...allAlmars, ...allAlnavs, ...allSecnavs, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi], type);
+        // Every feed the All view aggregates, static types included. Leaving
+        // Court-Martial out here read 3189 on the badge over a 3302-row list.
+        count = getFilteredCount([...allMaradmins, ...allMcpubs, ...allAlmars, ...allAlnavs, ...allSecnavs, ...allDodForms, ...allIgmcChecklists, ...allNavmcForms, ...allJtrs, ...allDodFmr, ...allDodi, ...allCourtMartial], type);
         baseText = 'All Messages';
         break;
     }
@@ -2282,7 +2117,9 @@ function renderEmptyState() {
 
     const hint = document.createElement('p');
     hint.className = 'no-results-detail';
-    hint.textContent = 'A "Failed to fetch" reason points at the proxy: unreachable, rate limited, or missing this origin from its CORS allowlist.';
+    hint.textContent = /^Static data file/.test(failure)
+      ? 'This source is a committed data file, not a live fetch. It fills in on the next deploy after the fetch script runs.'
+      : 'A "Failed to fetch" reason points at the proxy: unreachable, rate limited, or missing this origin from its CORS allowlist.';
     wrapper.appendChild(hint);
   }
 
@@ -2701,12 +2538,10 @@ function cacheData() {
     ["mcpub_cache", allMcpubs],
     ["alnav_cache", allAlnavs],
     ["almar_cache", allAlmars],
-    ["dodforms_cache", allDodForms],
     ["secnav_cache", allSecnavs],
     ["jtr_cache", allJtrs],
     ["dodfmr_cache", allDodFmr],
-    ["navmc_raw_cache", allNavmcRaw],
-    ["dodi_cache", allDodi]
+    ["navmc_raw_cache", allNavmcRaw]
   ];
 
   let written = 0;
@@ -2740,7 +2575,7 @@ function loadCachedData() {
         const feedCacheKeys = [
           "maradmin_cache", "mcpub_cache", "alnav_cache", "almar_cache",
           "dodforms_cache", "secnav_cache", "jtr_cache", "dodfmr_cache",
-          "navmc_raw_cache", "dodi_cache", "cache_timestamp"
+          "navmc_raw_cache", "dodi_cache", "cache_timestamp" // dodforms/dodi: legacy keys, cleared once
         ];
         feedCacheKeys.forEach(key => localStorage.removeItem(key));
         mainCacheExpired = true;
@@ -2795,18 +2630,6 @@ function loadCachedData() {
       }));
     }
 
-    const dodFormsCache = localStorage.getItem("dodforms_cache");
-    if (dodFormsCache) {
-      allDodForms = JSON.parse(dodFormsCache);
-      allDodForms = allDodForms.map(m => ({
-        ...m,
-        // Repair links cached before the DOMParser href fix: they were resolved
-        // against the app's own origin instead of esd.whs.mil.
-        link: repairDodFormLink(m.link),
-        pubDateObj: new Date(m.pubDate)
-      }));
-    }
-
     const secnavCache = localStorage.getItem("secnav_cache");
     if (secnavCache) {
       allSecnavs = JSON.parse(secnavCache);
@@ -2845,15 +2668,6 @@ function loadCachedData() {
         allNavmcForms.sort((a, b) => b.pubDateObj - a.pubDateObj);
         console.log(`[Cache] Hydrated ${allNavmcForms.length} NAVMC Forms`);
       }
-    }
-
-    const dodiCache = localStorage.getItem("dodi_cache");
-    if (dodiCache) {
-      allDodi = JSON.parse(dodiCache);
-      allDodi = allDodi.map(m => ({
-        ...m,
-        pubDateObj: new Date(m.pubDate)
-      }));
     }
 
     if (ts) {

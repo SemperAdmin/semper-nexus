@@ -8,9 +8,18 @@
  *
  * Source: https://www.igmc.marines.mil/Divisions/Inspections-Division/Checklists/
  * Target: lib/fa-checklists.js
+ *
+ * Run locally, not in CI. igmc.marines.mil sits behind Akamai and returns 403
+ * to datacenter ranges.
+ *
+ * Since 15 Sep 2026 this script never writes an empty or sharply smaller file.
+ * Before that, a failed fetch wrote an EMPTY data file and exited 0, so one bad
+ * network run silently deleted every committed checklist (82 at the time). A
+ * failed scrape now leaves the committed data in place and exits non-zero,
+ * matching scripts/fetch-court-martial.mjs.
  */
 
-import { writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -19,6 +28,20 @@ const __dirname = dirname(__filename);
 
 const SOURCE_URL = 'https://www.igmc.marines.mil/Divisions/Inspections-Division/Checklists/';
 const OUTPUT_FILE = join(__dirname, '../lib/fa-checklists.js');
+
+// A scrape returning fewer than this share of the committed record count is
+// treated as partial rather than as real deletions upstream.
+const SHRINK_TOLERANCE = 0.8;
+
+async function existingRecordCount() {
+  try {
+    const current = await readFile(OUTPUT_FILE, 'utf-8');
+    const match = current.match(/totalRecords:\s*(\d+)/);
+    return match ? Number(match[1]) : 0;
+  } catch {
+    return 0;
+  }
+}
 
 /**
  * Try multiple fetch methods with fallbacks
@@ -216,17 +239,33 @@ if (typeof module !== 'undefined' && module.exports) {
 async function main() {
   console.log('[FA Checklists] Starting fetch process...');
 
+  let checklists;
   try {
-    const checklists = await fetchFAChecklists();
-    await generateDataFile(checklists);
-    console.log('[FA Checklists] ✓ Complete');
-    process.exit(0);
+    checklists = await fetchFAChecklists();
   } catch (error) {
     console.error('[FA Checklists] Fatal error:', error);
-    // Still generate an empty file for graceful degradation
-    await generateDataFile([]);
-    process.exit(0); // Exit successfully even on error
+    console.error('[FA Checklists] Existing data left untouched. Run this from a workstation, not CI.');
+    process.exit(1);
   }
+
+  const previous = await existingRecordCount();
+
+  if (checklists.length === 0) {
+    console.error('[FA Checklists] Parsed zero checklists. Existing data left untouched.');
+    console.error('[FA Checklists] Either every fetch method failed (see the warnings above) or the JCSDashboard markup changed.');
+    process.exit(1);
+  }
+
+  if (previous > 0 && checklists.length < previous * SHRINK_TOLERANCE) {
+    console.error(`[FA Checklists] Parsed ${checklists.length} checklists against ${previous} committed.`);
+    console.error('[FA Checklists] That drop looks like a partial scrape. Existing data left untouched.');
+    console.error('[FA Checklists] Re-run, and if the listing genuinely shrank, delete the data file first.');
+    process.exit(1);
+  }
+
+  await generateDataFile(checklists);
+  console.log('[FA Checklists] ✓ Complete');
+  process.exit(0);
 }
 
 main();
