@@ -3,7 +3,7 @@
 
 // Cache version - update this when deploying new versions
 // Format: v{major}.{minor}.{patch}-{timestamp}
-const CACHE_VERSION = 'v2.7.0-20260912';
+const CACHE_VERSION = 'v2.8.0-20260915';
 const CACHE_NAME = `semper-nexus-${CACHE_VERSION}`;
 
 // Assets to cache immediately on install.
@@ -18,7 +18,10 @@ const STATIC_ASSETS = [
   './app.js',
   './lib/fa-checklists.js',
   './lib/secnav-data.js',
-  './lib/alnav-data.js'
+  './lib/alnav-data.js',
+  './lib/court-martial-data.js',
+  './lib/dodi-data.js',
+  './lib/dd-forms-data.js'
 ];
 // manifest.json and icon.svg are NOT precached: Vite rewrites their
 // references to hashed assets/ URLs in the build, so the root copies 404

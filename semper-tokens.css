@@ -199,6 +199,10 @@
 
 /* ============================================================
    Self-hosted variable fonts from /fonts/ (copied at build via vite-plugin-static-copy from @fontsource packages).
+   Paths are ../fonts/ on purpose: Vite bundles this sheet into /assets/main-*.css, so a bare fonts/ resolved to
+   /assets/fonts/ and 404ed on every deploy (system sans stood in for Bebas Neue and Inter until 15 Sep 2026).
+   ../fonts/ lands on /fonts/ from the bundle, on <base>/fonts/ under the GitHub Pages base, and on /fonts/ when the
+   repository root is served raw.
    Phase 1.3c: jsdelivr CDN dependency removed for SC-7 boundary protection.
    ============================================================ */
 @font-face {
@@ -206,8 +210,8 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("fonts/bebas-neue-latin-400-normal.woff2") format("woff2"),
-       url("fonts/bebas-neue-latin-400-normal.woff") format("woff");
+  src: url("../fonts/bebas-neue-latin-400-normal.woff2") format("woff2"),
+       url("../fonts/bebas-neue-latin-400-normal.woff") format("woff");
 }
 
 @font-face {
@@ -215,7 +219,7 @@
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url("fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  src: url("../fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
 }
 
 @font-face {
@@ -223,7 +227,7 @@
   font-style: italic;
   font-weight: 100 900;
   font-display: swap;
-  src: url("fonts/inter-latin-wght-italic.woff2") format("woff2-variations");
+  src: url("../fonts/inter-latin-wght-italic.woff2") format("woff2-variations");
 }
 
 @font-face {
@@ -231,7 +235,7 @@
   font-style: normal;
   font-weight: 100 800;
   font-display: swap;
-  src: url("fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2-variations");
+  src: url("../fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2-variations");
 }
 
 /* ============================================================

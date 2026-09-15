@@ -1,0 +1,106 @@
+From 40a02e77dfa936735647cfb79f976814ad78ffd8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 28 Aug 2026 23:59:40 +0000
+Subject: [PATCH] feat(header): link the logo to the Semper Admin Portal
+
+The header logo now links to https://semper-admin-portal.app.cloud.gov/,
+opening in a new tab so a reader keeps their place in Nexus.
+
+Built as a real anchor rather than a click handler on the image, so it is
+reachable by keyboard, announced by screen readers, and works with middle-click
+and open-in-new-window. The anchor carries no link decoration, so the header
+looks unchanged, and it gains a brass focus ring instead of the invisible focus
+an image-with-handler would have.
+
+- rel="noopener noreferrer" on the cross-origin target.
+- Image alt changes from "Nexus Logo" to "Semper Admin Portal", since alt text
+  on a linked image should describe the destination rather than the picture.
+- A visually hidden label states the destination and that it opens in a new
+  tab, since the logo carries no visible text.
+- Hover and focus give a subtle scale and opacity shift, suppressed under
+  prefers-reduced-motion.
+- No CSP change needed. This is a navigation, not a fetch.
+- Bump style.css cache buster to v=34.
+
+Verified in headless Chromium: the anchor resolves to the portal URL with
+target _blank and rel noopener noreferrer, the logo image renders inside it at
+48x45, text-decoration computes to none, the hidden label reads correctly, and
+two Tab presses land focus on the link with a visible outline.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NEbgLvn6i9pcjQQiZWpDeB
+---
+ index.html |  7 +++++--
+ style.css  | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 2 deletions(-)
+
+diff --git a/index.html b/index.html
+index 5aac23c..927ad55 100644
+--- a/index.html
++++ b/index.html
+@@ -39,7 +39,7 @@
+ <link rel="manifest" href="manifest.json">
+ <link rel="apple-touch-icon" href="icon.svg">
+ <link rel="stylesheet" href="semper-tokens.css?v=3">
+-<link rel="stylesheet" href="style.css?v=33">
++<link rel="stylesheet" href="style.css?v=34">
+ <link rel="stylesheet" href="ai-improvements.css?v=2">
+ <script src="vendor/purify.min.js?v=3.4.13"></script>
+ <script src="lib/safe-html.js?v=4"></script>
+@@ -52,7 +52,10 @@
+ 
+ <header>
+   <div class="branding">
+-    <img src="logo.png" alt="Nexus Logo" class="header-logo">
++    <a href="https://semper-admin-portal.app.cloud.gov/" class="header-logo-link" target="_blank" rel="noopener noreferrer" title="Semper Admin Portal (opens in a new tab)">
++      <img src="logo.png" alt="Semper Admin Portal" class="header-logo">
++      <span class="sr-only">Go to the Semper Admin Portal (opens in a new tab)</span>
++    </a>
+     <div class="header-text">
+       <h1 class="gradient-accent">Nexus</h1>
+       <p class="byline">by Semper Admin</p>
+diff --git a/style.css b/style.css
+index 4e324cc..4a49b18 100644
+--- a/style.css
++++ b/style.css
+@@ -107,6 +107,37 @@ header.header--hidden {
+   transition: height 0.2s ease;
+ }
+ 
++/* The header logo links to the Semper Admin Portal. No link decoration, so
++   the header looks unchanged, but it stays a real focus target for keyboard
++   users rather than an image that happens to be clickable. */
++.header-logo-link {
++  display: inline-flex;
++  align-items: center;
++  text-decoration: none;
++  border-radius: 4px;
++  transition: transform 0.15s ease, opacity 0.15s ease;
++}
++
++.header-logo-link:hover .header-logo,
++.header-logo-link:focus-visible .header-logo {
++  opacity: 0.85;
++  transform: scale(1.04);
++}
++
++.header-logo-link:focus-visible {
++  outline: 2px solid var(--color-brass, #C8A951);
++  outline-offset: 3px;
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .header-logo-link,
++  .header-logo-link:hover .header-logo,
++  .header-logo-link:focus-visible .header-logo {
++    transition: none;
++    transform: none;
++  }
++}
++
+ .header-text {
+   display: flex;
+   flex-direction: column;
+-- 
+2.43.0
+
