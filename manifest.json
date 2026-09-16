@@ -9,17 +9,11 @@
   "theme_color": "#0A1424",
   "background_color": "#0A1424",
   "icons": [
-    {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "categories": ["productivity", "reference", "utilities"],
   "lang": "en-US",
   "dir": "ltr",
-  "prefer_related_applications": false,
-  "privacy_policy_url": "PRIVACY_POLICY.md",
-  "terms_of_service_url": "TERMS_OF_SERVICE.md"
+  "prefer_related_applications": false
 }

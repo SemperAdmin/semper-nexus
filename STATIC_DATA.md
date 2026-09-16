@@ -124,3 +124,30 @@ naming the seed file, never "no messages found".
 
 Both scripts refuse to write an empty file or one under 80 percent of the
 committed count, and `fetch-fa-checklists.mjs` now behaves the same way.
+
+## How-To Videos (added 16 Sep 2026)
+
+`lib/how-to-videos.js` lists the Semper Admin walkthrough videos for Nexus.
+The header How-To button and the footer "How-To Videos" link open a modal
+with all of them, and the chip under the tab row names the video that covers
+the active tab. `npm run fetch-videos` regenerates the file from the Vanguard
+Asset Manager catalog, not from a website:
+
+```
+E:\Videos\Video Database\Video Database\data\vanguard.db   (assets table)
+```
+
+Pass another path as an argument or set `VANGUARD_DB` if the catalog moves.
+The script keeps every title that starts with `Nexus, `, drops that prefix
+("Nexus, Nexus on Your Phone" ships as "Nexus on Your Phone"), takes the
+one-line summary and the approximate length from the YouTube description, and
+records both the MarineNet URL (CAC on a .mil network) and the YouTube URL.
+No catalog row carries a YouTube URL yet, so the app shows MarineNet only;
+once the uploads land in the catalog, one run adds the YouTube buttons.
+
+Which tab each video belongs to lives in `VIDEO_MAP` inside
+`scripts/fetch-how-to-videos.mjs`, keyed by the cleaned title. A new video
+that is not in the map still ships, under Getting Started with no tab chip,
+and the run prints a warning naming it. The same empty-file and 80 percent
+shrink guards apply. Run it from the workstation that holds the database,
+commit `lib/how-to-videos.js`, and bump the service worker cache version.

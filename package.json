@@ -11,6 +11,7 @@
     "fetch-cmr": "node scripts/fetch-court-martial.mjs",
     "fetch-dodi": "node scripts/fetch-dodi.mjs",
     "fetch-dd-forms": "node scripts/fetch-dd-forms.mjs",
+    "fetch-videos": "node scripts/fetch-how-to-videos.mjs",
     "fetch-secnav": "node scripts/fetch-secnav.mjs",
     "fetch-alnav": "node scripts/fetch-alnav.mjs",
     "generate-secnav": "node scripts/generate-secnav-data.mjs",

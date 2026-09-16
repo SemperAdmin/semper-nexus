@@ -37,13 +37,13 @@
 <meta name="theme-color" content="#0A1424">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="stylesheet" href="semper-tokens.css?v=4">
-<link rel="stylesheet" href="style.css?v=34">
+<link rel="stylesheet" href="style.css?v=35">
 <link rel="stylesheet" href="ai-improvements.css?v=2">
 <script src="vendor/purify.min.js?v=3.4.15"></script>
 <script src="lib/safe-html.js?v=4"></script>
-<script src="lib/icons.js?v=2" defer></script>
+<script src="lib/icons.js?v=3" defer></script>
 <script src="lib/a11y.js?v=1" defer></script>
 </head>
 <body>
@@ -65,6 +65,7 @@
   <div class="controls">
     <button id="refreshBtn" aria-label="Refresh data from server"><span class="icon-wrapper" data-icon="arrows-rotate"></span> Refresh</button>
     <button id="themeToggle" aria-label="Toggle dark mode"><span class="icon-wrapper" data-icon="moon"></span> Dark Mode</button>
+    <button id="howToBtn" aria-haspopup="dialog" aria-controls="howToModal"><span class="icon-wrapper" data-icon="circle-play"></span> How-To</button>
     <a id="feedbackLink" class="control-link" href="https://forms.osi.apps.mil/r/k5QWzJDL9P" target="_blank" rel="noopener noreferrer" aria-label="Open the feedback form in a new tab"><span class="icon-wrapper" data-icon="message-square"></span> Feedback</a>
   </div>
 </header>
@@ -89,6 +90,8 @@
     <a class="message-type-btn message-type-btn--external" data-type="ican" href="https://usmc.sharepoint-mil.us.mcas-gov.us/sites/DCPR_RFF_External/Finance_Policy/SitePages/Advisory%20Notifications.aspx" target="_blank" rel="noopener noreferrer" title="Opens Advisory Notifications on SharePoint in a new tab. CAC sign-in required.">ICAN <span class="external-icon" aria-hidden="true">&#8599;</span><span class="sr-only"> (opens external SharePoint site in new tab, CAC required)</span></a>
     <button class="message-type-btn all-messages-btn" data-type="all" role="tab" aria-selected="false" aria-controls="results">All Messages <span class="tab-counter" aria-label="0 messages">0</span></button>
   </div>
+  <!-- How-to video for the active tab, rendered by app.js from lib/how-to-videos.js -->
+  <div id="tabHowTo" class="tab-howto hidden"></div>
   <div class="filters-section">
     <div class="search-container">
       <label for="searchInput" class="sr-only">Search messages</label>
@@ -127,11 +130,25 @@
     </div>
   </div>
 </main>
+<!-- How-To Videos Modal (list rendered by app.js from lib/how-to-videos.js).
+   Kept outside <main>: main is an isolated stacking context, so a fixed
+   modal inside it would paint under the fixed header. -->
+<div id="howToModal" class="feedback-modal hidden" role="dialog" aria-modal="true" aria-labelledby="howToModalTitle">
+  <div class="feedback-modal-content howto-modal-content">
+    <div class="feedback-modal-header">
+      <h2 id="howToModalTitle"><span class="icon-wrapper" data-icon="circle-play"></span> How-To Videos</h2>
+      <button id="closeHowToModal" class="feedback-close-btn" aria-label="Close how-to videos"><span class="icon-wrapper" data-icon="xmark"></span></button>
+    </div>
+    <div id="howToModalBody" class="howto-body"></div>
+  </div>
+</div>
+
 <footer>
   <p class="nexus-branding">A Semper Admin Project</p>
   <p>Data source Last updated: <span id="lastUpdate">Never</span></p>
   <p class="footer-note">Auto-refreshes every 10 minutes • Data cached for offline access</p>
   <div class="footer-legal">
+    <button id="howToFooterBtn" class="footer-legal-btn">How-To Videos</button>
     <button id="privacyPolicyBtn" class="footer-legal-btn">Privacy Policy</button>
     <button id="termsOfServiceBtn" class="footer-legal-btn">Terms of Service</button>
     <a href="https://forms.osi.apps.mil/r/k5QWzJDL9P" class="footer-legal-btn" target="_blank" rel="noopener noreferrer">Send Feedback<span class="sr-only"> (opens in new tab)</span></a>
@@ -145,10 +162,11 @@
 <script src="lib/dd-forms-data.js"></script>
 <script src="lib/secnav-data.js"></script>
 <script src="lib/alnav-data.js"></script>
+<script src="lib/how-to-videos.js"></script>
 
 <script src="vendor/web-vitals.iife.js?v=6.2.1"></script>
 
-<script src="app.js?v=43"></script>
+<script src="app.js?v=45"></script>
 
 <!-- Service Worker Registration for PWA -->
 <script src="pwa-init.js"></script>

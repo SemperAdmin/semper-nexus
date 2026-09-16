@@ -288,7 +288,7 @@ function countInScope(messages, type) {
     out = out.filter(m => m.pubDateObj >= cutoffDate);
   }
   if (term) {
-    out = out.filter(m => m.searchText.includes(term));
+    out = out.filter(m => matchesSearch(m, term));
   }
   return out.length;
 }
@@ -385,6 +385,7 @@ document.addEventListener("DOMContentLoaded", () => {
   startAutoRefresh();
   initStickyHeader();
   initKeyboardShortcuts();
+  initHowToVideos(); // After restoreFilterPreferences, so the chip matches the restored tab
 });
 refreshBtn.addEventListener("click", () => {
   // Warn user about API quota consumption before refreshing
@@ -568,7 +569,9 @@ function mapNavmcRecord(f) {
     numericId: String(f.id || f.stockNumber || id),
     subject: displaySubject,
     title: id,
-    link: f.dsoSearchLink || 'https://dso.dla.mil/DONForms/?search=NAVMC',
+    // The proxy sends no per-form link, so every card opened the same
+    // NAVMC-wide search. Pre-fill the DLA search with this form's number.
+    link: f.dsoSearchLink || ('https://dso.dla.mil/DONForms/?search=' + encodeURIComponent(id.replace(/\s*\(.*$/, ''))),
     pubDate: pubDate,
     pubDateObj: safeDateObj,
     summary: `${f.sponsor || ''} | ${status}`.trim(),
@@ -1564,11 +1567,11 @@ function parseRSS(xmlText, type){
       }
     } else if (type === 'mcpub') {
       // Extract MCPUB ID from title (e.g., "MCO 5110.1D", "MCBUL 5000")
-      const mcpubMatch = title.match(/(MCO|MCBUL|MCRP|FMFM|MCWP|NAVMC)\s+[\d.]+[A-Z]*/i);
+      const mcpubMatch = title.match(/(MCO|MCBUL|MCRP|FMFM|MCWP|NAVMC)\s+[\d.-]+[A-Z]*(?:\.\d+[A-Z]*)?/i);
       if (mcpubMatch) {
         id = mcpubMatch[0];
         numericId = mcpubMatch[0];
-        subject = title.replace(/(MCO|MCBUL|MCRP|FMFM|MCWP|NAVMC)\s+[\d.]+[A-Z]*\s*[-:]?\s*/i, "").trim();
+        subject = title.replace(/(MCO|MCBUL|MCRP|FMFM|MCWP|NAVMC)\s+[\d.-]+[A-Z]*(?:\.\d+[A-Z]*)?\s*[-:]?\s*/i, "").trim();
       } else {
         const linkMatch = link.match(/\/Article\/(\d+)\//);
         id = linkMatch ? `Article ${linkMatch[1]}` : `MCPUB ${index + 1}`;
@@ -1671,6 +1674,7 @@ function switchMessageType(type) {
   // Save preference
   localStorage.setItem('filter_message_type', type);
 
+  updateTabHowTo(type);
   filterMessages();
 }
 
@@ -1698,6 +1702,28 @@ function showAlnavSecnavErrorMessage() {
   if (summaryStats) {
     summaryStats.classList.add('hidden');
   }
+}
+
+// Search match for one record. Words of three or more characters must all
+// appear (AND logic, partial match inside a token, any order). A term with no
+// word that long falls back to a plain substring match on the search text.
+// Tokens are derived from searchText on first use: several loaders (ALNAV,
+// SECNAV, DODFMR, FA checklists, DoDI, DD forms) never stored searchTokens,
+// so a two-word search on All Messages threw on the first such record and
+// left the list and the status line stale.
+function matchesSearch(m, term) {
+  const text = m.searchText || '';
+  const words = term.split(/\s+/).filter(word => word.length > 2);
+  if (words.length === 0) {
+    return text.includes(term);
+  }
+  if (words.length === 1) {
+    return text.includes(words[0]);
+  }
+  if (!m.searchTokens) {
+    m.searchTokens = text.split(/\s+/).filter(token => token.length > 2);
+  }
+  return words.every(word => m.searchTokens.some(token => token.includes(word)));
 }
 
 // Filter and Search Functions
@@ -1751,31 +1777,11 @@ function filterMessages() {
     console.log(`After date filter: ${filtered.length} messages`);
   }
 
-  // Apply search filter with improved tokenized search
+  // Apply search filter. One matcher serves the list, the status line, and
+  // the tab counters, so the three never disagree.
   if (searchTerm) {
     console.log(`Filtering by search term: "${searchTerm}"`);
-
-    // Tokenize search query for multi-word search (same filter as searchTokens)
-    const searchWords = searchTerm.split(/\s+/).filter(word => word.length > 2);
-
-    if (searchWords.length === 1) {
-      // Single word search - use the valid word, not the full search term
-      filtered = filtered.filter(m => m.searchText.includes(searchWords[0]));
-    } else if (searchWords.length > 1) {
-      // Multi-word search - use pre-computed searchTokens for performance
-      // All search words must match (AND logic)
-      filtered = filtered.filter(m => {
-        // Use the pre-computed searchTokens array for faster matching
-        // This preserves partial matching within tokens
-        return searchWords.every(word =>
-          m.searchTokens.some(token => token.includes(word))
-        );
-      });
-    } else {
-      // Search term too short (all words < 3 chars), use full text search
-      filtered = filtered.filter(m => m.searchText.includes(searchTerm));
-    }
-
+    filtered = filtered.filter(m => matchesSearch(m, searchTerm));
     console.log(`After search filter: ${filtered.length} messages`);
   }
 
@@ -2180,6 +2186,12 @@ function renderCompactView(arr) {
 
     // Determine which field to display as subject
     let displaySubject = config.subjectSource === 'summary' ? (item.summary || item.subject) : item.subject;
+    // The marines.mil MCPEL feed titles items by number only and carries the
+    // publication title in the description, so the card printed "MCO 1610.7B: "
+    // with nothing after the colon. Fall back to the description text.
+    if (!displaySubject || !displaySubject.trim()) {
+      displaySubject = (item.description || item.summary || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').replace(/\.\.\.$/, '').trim();
+    }
 
     // Prepend ID to title if configured
     if (config.prependIdToTitle && item.id) {
@@ -3159,4 +3171,258 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
   initLegalModal();
 } else {
   document.addEventListener('DOMContentLoaded', initLegalModal);
+}
+
+// ============================================================================
+// HOW-TO VIDEOS
+// Short walkthroughs from the Semper Admin catalog (lib/how-to-videos.js,
+// regenerated with npm run fetch-videos). The header How-To button and the
+// footer link open a modal listing all of them; #tabHowTo under the tab row
+// names the one that covers the active tab. Everything is built with DOM
+// calls and textContent, so no sanitizer pass is needed.
+// ============================================================================
+
+function getHowToVideos() {
+  const list = window.HOW_TO_VIDEOS;
+  return Array.isArray(list) ? list : [];
+}
+
+function howToVideosForTab(type) {
+  return getHowToVideos().filter(video => Array.isArray(video.tabs) && video.tabs.includes(type));
+}
+
+function isExternalHttpUrl(value) {
+  return typeof value === 'string' && /^https?:\/\//i.test(value);
+}
+
+function createHowToIcon() {
+  const icon = document.createElement('span');
+  icon.className = 'icon-wrapper';
+  icon.setAttribute('data-icon', 'circle-play');
+  return icon;
+}
+
+function formatHowToLength(video) {
+  return Number.isFinite(video.approxMinutes) && video.approxMinutes > 0
+    ? `about ${video.approxMinutes} min`
+    : '';
+}
+
+// MarineNet sits behind a CAC on a .mil network; YouTube is reachable from
+// anywhere but is often blocked on government networks. Both are offered
+// whenever the catalog has both URLs.
+function renderHowToLinks(video) {
+  const wrap = document.createElement('span');
+  wrap.className = 'howto-links';
+
+  const targets = [
+    {
+      url: video.marinenetUrl,
+      label: 'MarineNet',
+      name: `Watch ${video.title} on MarineNet (opens in a new tab, CAC sign-in required)`,
+      title: 'Opens on MarineNet in a new tab. CAC sign-in on a .mil network required.'
+    },
+    {
+      url: video.youtubeUrl,
+      label: 'YouTube',
+      name: `Watch ${video.title} on YouTube (opens in a new tab)`,
+      title: 'Opens on YouTube in a new tab.'
+    }
+  ];
+
+  targets.forEach(target => {
+    if (!isExternalHttpUrl(target.url)) { return; }
+    const link = document.createElement('a');
+    link.className = 'howto-link';
+    link.href = target.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.title = target.title;
+    link.setAttribute('aria-label', target.name);
+    const arrow = document.createElement('span');
+    arrow.className = 'external-icon';
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '↗';
+    link.append(`${target.label} `, arrow);
+    wrap.append(link);
+  });
+
+  return wrap;
+}
+
+// Chip under the tab row. Called on every tab switch and once at startup
+// after the saved tab is restored. The external link tabs (PAA and the other
+// CAC tabs) navigate away instead of switching, so their video is reached
+// from the modal only.
+function updateTabHowTo(type = currentMessageType) {
+  const chip = document.getElementById('tabHowTo');
+  if (!chip) { return; }
+
+  const videos = howToVideosForTab(type);
+  chip.replaceChildren();
+  if (videos.length === 0) {
+    chip.classList.add('hidden');
+    return;
+  }
+
+  videos.forEach(video => {
+    const row = document.createElement('div');
+    row.className = 'tab-howto-row';
+
+    const label = document.createElement('span');
+    label.className = 'tab-howto-label';
+    label.append(createHowToIcon(), ' How-to video:');
+
+    const title = document.createElement('span');
+    title.className = 'tab-howto-title';
+    title.textContent = video.title;
+
+    row.append(label, title);
+
+    const length = formatHowToLength(video);
+    if (length) {
+      const meta = document.createElement('span');
+      meta.className = 'tab-howto-meta';
+      meta.textContent = length;
+      row.append(meta);
+    }
+
+    row.append(renderHowToLinks(video));
+    chip.append(row);
+  });
+
+  chip.classList.remove('hidden');
+}
+
+function renderHowToList(container) {
+  const videos = getHowToVideos();
+  container.replaceChildren();
+
+  if (videos.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'howto-empty';
+    empty.textContent = 'No how-to videos are available yet.';
+    container.append(empty);
+    return;
+  }
+
+  const note = document.createElement('p');
+  note.className = 'howto-note';
+  note.textContent = videos.some(video => isExternalHttpUrl(video.youtubeUrl))
+    ? 'Each video plays on MarineNet (CAC sign-in on a .mil network) or on YouTube. Links open in a new tab.'
+    : 'Videos play on MarineNet. CAC sign-in on a .mil network is required. Links open in a new tab.';
+  container.append(note);
+
+  const groups = [
+    { key: 'start', title: 'Getting started' },
+    { key: 'tab', title: 'Tab by tab' }
+  ];
+
+  groups.forEach(group => {
+    const items = videos.filter(video => (video.group || 'start') === group.key);
+    if (items.length === 0) { return; }
+
+    const section = document.createElement('section');
+    section.className = 'howto-group';
+    section.setAttribute('aria-labelledby', `howToGroup-${group.key}`);
+
+    const heading = document.createElement('h3');
+    heading.className = 'howto-group-title';
+    heading.id = `howToGroup-${group.key}`;
+    heading.textContent = group.title;
+
+    const list = document.createElement('ul');
+    list.className = 'howto-list';
+
+    items.forEach(video => {
+      const item = document.createElement('li');
+      item.className = 'howto-item';
+
+      const main = document.createElement('div');
+      main.className = 'howto-item-main';
+
+      const title = document.createElement('span');
+      title.className = 'howto-item-title';
+      title.textContent = video.title;
+      main.append(title);
+
+      const length = formatHowToLength(video);
+      if (length) {
+        const meta = document.createElement('span');
+        meta.className = 'howto-item-meta';
+        meta.textContent = ` · ${length}`;
+        main.append(meta);
+      }
+
+      if (video.summary) {
+        const summary = document.createElement('p');
+        summary.className = 'howto-item-summary';
+        summary.textContent = video.summary;
+        main.append(summary);
+      }
+
+      item.append(main, renderHowToLinks(video));
+      list.append(item);
+    });
+
+    section.append(heading, list);
+    container.append(section);
+  });
+}
+
+function initHowToVideos() {
+  const modal = document.getElementById('howToModal');
+  const body = document.getElementById('howToModalBody');
+  const closeBtn = document.getElementById('closeHowToModal');
+  const openers = [document.getElementById('howToBtn'), document.getElementById('howToFooterBtn')].filter(Boolean);
+
+  if (!modal || !body || !closeBtn || openers.length === 0) {
+    console.warn('[How-To] Required elements not found');
+    return;
+  }
+
+  renderHowToList(body);
+  updateTabHowTo();
+
+  // lib/a11y.js supplies the focus trap, Escape handling, and focus restore.
+  // Without it the modal still opens and closes; only focus management is
+  // reduced.
+  let trap = null;
+
+  function openModal(opener) {
+    modal.classList.remove('hidden');
+    if (window.NexusA11y && typeof window.NexusA11y.trapModal === 'function') {
+      trap = window.NexusA11y.trapModal(modal, opener);
+    } else {
+      closeBtn.focus();
+    }
+  }
+
+  function closeModal() {
+    if (trap) {
+      trap.close();
+      trap = null;
+      return;
+    }
+    modal.classList.add('hidden');
+  }
+
+  openers.forEach(btn => btn.addEventListener('click', () => openModal(btn)));
+  closeBtn.addEventListener('click', closeModal);
+
+  // Close on background click (click outside modal content)
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      closeModal();
+    }
+  });
+
+  // Escape when the focus trap is unavailable (the trap handles it itself)
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !trap) {
+      closeModal();
+    }
+  });
+
+  console.log(`[How-To] ${getHowToVideos().length} videos listed`);
 }

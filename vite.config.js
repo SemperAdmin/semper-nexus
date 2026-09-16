@@ -12,6 +12,7 @@ export default defineConfig({
         // dest; rename.stripBase / rename.name flatten each target back to
         // the layout index.html expects (lib/, vendor/, fonts/).
         { src: 'lib/*', dest: 'lib', rename: { stripBase: 1 } },
+        { src: 'icons/*', dest: 'icons', rename: { stripBase: 1 } },
         { src: 'app.js', dest: '' },
         { src: 'pwa-init.js', dest: '' },
         { src: 'service-worker.js', dest: '' },
