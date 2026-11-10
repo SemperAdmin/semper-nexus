@@ -147,4 +147,6 @@ Inspired by [navadmin-scanner](https://github.com/mpyne-navy/navadmin-scanner) b
 
 ## License
 
+Code is released under the MIT License. See [LICENSE](LICENSE).
+
 This is an unofficial tool not affiliated with the United States Marine Corps, United States Navy, or Department of Defense.
