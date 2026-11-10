@@ -1,24 +1,30 @@
 # Security Guide for Nexus Proxy Server
 
-## Status: minimal external secrets
+## Status: no secrets
 
-After AI summary removal, the only secret required by the proxy server is:
+The proxy server holds no credentials. It reads two environment variables, and neither is a secret:
 
-- `GITHUB_TOKEN` - GitHub Personal Access Token used by the feedback widget to file issues against `furby203824/Nexus`. Optional. If unset, the feedback endpoint returns 503.
+- `PORT` - listening port.
+- `ALLOWED_ORIGINS` - optional comma-separated list of extra CORS origins.
+
+The feedback widget and its `GITHUB_TOKEN` were removed. The `/api/debug/github` route went with them. Remove any `GITHUB_TOKEN` or `GITHUB_REPO` variable still set in the Render dashboard, and revoke the token it held at https://github.com/settings/tokens.
 
 There are no Google API keys, no Gemini integration, and no AI summary storage in this build.
 
-## API key handling
+## Adding a secret later
 
-- All secrets are read from environment variables only. No hardcoded keys.
-- For Render.com deployment, set the variable in the Render dashboard under Environment.
-- For GitHub Actions deployment automation, store in repository Settings -> Secrets -> Actions and inject via the workflow `env:` block.
-- Rotate the `GITHUB_TOKEN` at least quarterly. Revoke and replace immediately on suspected exposure at https://github.com/settings/tokens.
+- Read it from an environment variable only. No hardcoded keys.
+- Never return any part of it from a route. A prefix is enough to identify a token.
+- Put authentication in front of any route using it.
+
+## Generic proxy route
+
+`/api/proxy` fetches only https URLs on the standard port for hosts in `PROXY_ALLOWED_DOMAINS`. Every redirect hop passes the same check, so an allowlisted host is not able to forward the request elsewhere. Keep the list to official sources.
 
 ## Production deployment checklist
 
 1. Set environment variables on the host. Never commit secrets to the repository.
-2. Replace the TLS verification bypass at `server.js` line `new https.Agent({ rejectUnauthorized: false })` with a proper trust chain. The bypass is a hard compliance blocker for any DoD-adjacent deployment.
+2. Keep TLS verification on. `server.js` sets `rejectUnauthorized: true` on its https agent. Never turn it off.
 3. Confirm the CORS allowlist in `server.js` matches your deployed origin. The current default is `https://nexus.github.io`.
 4. Apply the rate limiter (already in place, 100 requests per 15-minute window).
 5. Restrict firewall ingress to the configured `PORT` only.
@@ -33,9 +39,8 @@ There are no Google API keys, no Gemini integration, and no AI summary storage i
 
 ## Incident response
 
-If `GITHUB_TOKEN` is compromised:
-1. Revoke immediately at https://github.com/settings/tokens.
-2. Generate a fresh PAT with `repo` scope only.
-3. Update the secret in Render dashboard and in GitHub Actions repository secrets.
-4. Review the GitHub issue audit log for unauthorized issue creation.
-5. Rotate any other credentials reachable from the same workstation as a precaution.
+The service holds no credential today. If one is added and later exposed:
+1. Revoke it at the issuer immediately.
+2. Replace it in the Render dashboard and in GitHub Actions repository secrets.
+3. Review the issuer's audit log for use you did not make.
+4. Rotate any other credential reachable from the same workstation.

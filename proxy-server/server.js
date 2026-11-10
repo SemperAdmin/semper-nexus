@@ -10,26 +10,18 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Environment variables
-// NO HARDCODED KEYS - Security requirement
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN; // GitHub Personal Access Token for creating issues
-const GITHUB_REPO = process.env.GITHUB_REPO || "furby203824/Nexus"; // GitHub repo (owner/repo)
-
-if (!GITHUB_TOKEN) {
-  console.error('❌ WARNING: GITHUB_TOKEN environment variable is not set');
-  console.error('   Feedback widget will not be able to create GitHub issues');
-  console.error('   Create a GitHub Personal Access Token with repo scope');
-}
+// This service holds no secrets. It reads only PORT and ALLOWED_ORIGINS from
+// the environment. Do not add a credential here without an auth design.
 
 // Trust proxy - Required for Render.com and other hosting platforms
 // Allows rate limiting to work correctly with X-Forwarded-For headers
 app.set('trust proxy', true);
 
 // CORS allowlist.
-// furby203824.github.io is the PoC deploy target.
 // semperadmin.github.io serves the GitHub Pages build.
-// nexus.github.io is reserved for the Semper Admin migration.
 // nexus.app.cloud.gov is the cloud.gov production frontend.
+// List only origins this project controls. nexus.github.io belongs to an
+// unrelated GitHub account and the furby203824 copy is retired.
 // localhost entries cover local dev with Vite/static servers on common ports.
 //
 // ALLOWED_ORIGINS (comma-separated env var) extends this list at runtime so a
@@ -37,9 +29,7 @@ app.set('trust proxy', true);
 // deploy previously dropped nexus.app.cloud.gov and silently broke every
 // browser fetch from production.
 const DEFAULT_ALLOWED_ORIGINS = [
-  'https://furby203824.github.io',
   'https://semperadmin.github.io',
-  'https://nexus.github.io',
   'https://nexus.app.cloud.gov',
   'http://localhost:8000',
   'http://127.0.0.1:8000',
@@ -120,66 +110,6 @@ app.get(['/health', '/api/health'], (req, res) => {
     commit: process.env.RENDER_GIT_COMMIT || 'unknown',
     corsAllowlist: ALLOWED_ORIGINS
   });
-});
-
-// Debug endpoint to test GitHub API configuration
-app.get('/api/debug/github', async (req, res) => {
-  const results = {
-    tokenConfigured: !!GITHUB_TOKEN,
-    tokenPrefix: GITHUB_TOKEN ? GITHUB_TOKEN.substring(0, 7) + '...' : 'NOT SET',
-    repoConfigured: !!GITHUB_REPO,
-    repo: GITHUB_REPO || 'NOT SET',
-    testPayload: null,
-    apiTest: null
-  };
-
-  // Create a test payload to show what would be sent
-  results.testPayload = {
-    title: '[BUG REPORT] Test feedback',
-    body: '## User Feedback\n\n**Type:** Bug Report\n\n**Description:**\nThis is a test.\n\n---\n\n## Context\n- **Browser:** Test\n\n---\n*This issue was automatically created via the in-app feedback widget.*'
-  };
-
-  // Test GitHub API if token is configured
-  if (GITHUB_TOKEN && GITHUB_REPO) {
-    try {
-      // Test authentication by getting repo info
-      const response = await axios.get(
-        `https://api.github.com/repos/${GITHUB_REPO}`,
-        {
-          headers: {
-            'Authorization': `token ${GITHUB_TOKEN}`,
-            'Accept': 'application/vnd.github.v3+json'
-          },
-          timeout: 10000
-        }
-      );
-
-      results.apiTest = {
-        success: true,
-        repoExists: true,
-        repoName: response.data.full_name,
-        hasIssues: response.data.has_issues,
-        permissions: {
-          // Only expose relevant permissions for debugging
-          admin: response.data.permissions?.admin || false,
-          push: response.data.permissions?.push || false,
-          pull: response.data.permissions?.pull || false
-        }
-      };
-    } catch (error) {
-      results.apiTest = {
-        success: false,
-        error: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        message: error.response?.data?.message
-      };
-    }
-  } else {
-    results.apiTest = { success: false, error: 'Token or repo not configured' };
-  }
-
-  res.json(results);
 });
 
 // Proxy endpoint for ALNAV
@@ -547,6 +477,35 @@ app.get('/api/dodi', async (req, res) => {
   }
 });
 
+// Allowlist for the generic proxy route. Official sources only.
+const PROXY_ALLOWED_DOMAINS = [
+  'mynavyhr.navy.mil',
+  'secnav.navy.mil',
+  'navy.mil',
+  'marines.mil',        // USMC RSS feeds (MARADMIN, MCPUB, ALMAR)
+  'travel.dod.mil'      // DoD JTR (Joint Travel Regulations)
+];
+
+// Returns null when the target is allowed, or { status, error } when it is not.
+// Used for the requested URL and again for every redirect hop.
+function checkProxyTarget(protocol, hostname, port) {
+  // Only https on the standard port. A non-default port would let the
+  // allowlisted hosts be used for internal port scanning or service probing.
+  if (protocol !== 'https:' || (port !== '' && port != null && String(port) !== '443')) {
+    return { status: 400, error: 'Only https targets on the standard port are allowed' };
+  }
+  // Exact host or true dot-boundary subdomain match. A bare endsWith() would
+  // treat any hostname ending in the allowlisted string as allowed.
+  const host = String(hostname || '').toLowerCase();
+  const isAllowed = PROXY_ALLOWED_DOMAINS.some(domain =>
+    host === domain || host.endsWith('.' + domain)
+  );
+  if (!isAllowed) {
+    return { status: 403, error: 'Domain not allowed' };
+  }
+  return null;
+}
+
 // Generic proxy endpoint (use with caution)
 app.get('/api/proxy', async (req, res) => {
   const targetUrl = req.query.url;
@@ -555,16 +514,6 @@ app.get('/api/proxy', async (req, res) => {
     return res.status(400).json({ error: 'Missing url parameter' });
   }
 
-  // Whitelist allowed domains for security
-  const allowedDomains = [
-    'mynavyhr.navy.mil',
-    'secnav.navy.mil',
-    'navy.mil',
-    'marines.mil',        // USMC RSS feeds (MARADMIN, MCPUB, ALMAR)
-    'rss.app',            // RSS feed proxy for ALNAV, SECNAV
-    'travel.dod.mil'      // DoD JTR (Joint Travel Regulations)
-  ];
-
   let urlObj;
   try {
     urlObj = new URL(targetUrl);
@@ -572,24 +521,11 @@ app.get('/api/proxy', async (req, res) => {
     return res.status(400).json({ error: 'Invalid url parameter' });
   }
 
-  // Only proxy https targets on the standard port. A non-default port would let
-  // the allowlisted hosts be used for internal port scanning / service probing.
-  if (urlObj.protocol !== 'https:' || urlObj.port !== '') {
-    return res.status(400).json({ error: 'Only https targets on the standard port are allowed' });
-  }
-
-  // Exact host or true dot-boundary subdomain match. A bare endsWith() would
-  // treat any hostname ending in the allowlisted string as allowed, so a
-  // commercial suffix like "rss.app" would match an attacker-registered
-  // "myrss.app" and turn this route into an open relay.
-  const isAllowed = allowedDomains.some(domain =>
-    urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain)
-  );
-
-  if (!isAllowed) {
-    return res.status(403).json({
-      error: 'Domain not allowed',
-      allowedDomains: allowedDomains
+  const rejection = checkProxyTarget(urlObj.protocol, urlObj.hostname, urlObj.port);
+  if (rejection) {
+    return res.status(rejection.status).json({
+      error: rejection.error,
+      allowedDomains: PROXY_ALLOWED_DOMAINS
     });
   }
 
@@ -599,6 +535,16 @@ app.get('/api/proxy', async (req, res) => {
     const response = await axios.get(targetUrl, {
       httpsAgent,
       timeout: 30000,
+      maxRedirects: 5,
+      // Every redirect hop passes the same check as the first URL. Without
+      // this, an allowlisted host answering with a redirect would carry the
+      // request to any destination.
+      beforeRedirect: (options) => {
+        const hop = checkProxyTarget(options.protocol, options.hostname, options.port);
+        if (hop) {
+          throw new Error(`Redirect to a disallowed target blocked: ${hop.error}`);
+        }
+      },
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8,application/rss+xml'
@@ -627,7 +573,6 @@ app.get('/api/proxy', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Proxy server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`GitHub debug: http://localhost:${PORT}/api/debug/github`);
   console.log(`ALNAV endpoint: http://localhost:${PORT}/api/alnav/2025`);
   console.log(`SECNAV endpoint: http://localhost:${PORT}/api/navy-directives`);
   console.log(`NAVMC Forms endpoint: http://localhost:${PORT}/api/navmc-forms?page=1&pageSize=100`);
