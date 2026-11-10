@@ -751,6 +751,26 @@ async function fetchAlnavMessages() {
   }
 }
 
+// Fetch a page through the Render proxy. Returns the response text, or null
+// when the proxy is not configured, refuses the host, or fails. Callers treat
+// null as "this route did not work" and fall through to their own error path.
+// The proxy accepts only hosts on its allowlist (see proxy-server/server.js).
+async function fetchViaCustomProxy(targetUrl) {
+  if (!CUSTOM_PROXY_URL) {return null;}
+  try {
+    const proxyUrl = `${CUSTOM_PROXY_URL}/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+    const response = await Promise.race([
+      fetch(proxyUrl),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Render proxy timeout')), 15000))
+    ]);
+    if (response.ok) {return await response.text();}
+    return null;
+  } catch (err) {
+    console.log(`Render proxy fetch failed for ${targetUrl}:`, err.message);
+    return null;
+  }
+}
+
 // Fetch and parse a single ALNAV page
 async function fetchAlnavPage(url) {
   try {
