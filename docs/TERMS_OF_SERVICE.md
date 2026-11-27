@@ -1,27 +1,25 @@
-# Terms of Service for Message Watch
+# Terms of Service for Semper Nexus
 
 **Effective Date:** June 2, 2026  
-**Last Updated:** June 2, 2026  
+**Last Updated:** November 27, 2026  
 **Operator:** Semper Admin
 
 ---
 
 ## 1. Acceptance of Terms
 
-By accessing and using Message Watch ("App"), you agree to be bound by these Terms of Service and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using or accessing this App.
+By accessing and using Semper Nexus ("App"), you agree to be bound by these Terms of Service and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using or accessing this App.
 
 ---
 
 ## 2. License to Use
 
-Semper Admin grants you a limited, non-exclusive, revocable license to use the App for personal, non-commercial purposes. You may not:
+**Source code.** The source code is published under the MIT License (see the LICENSE file in the repository). Nothing in these terms limits the rights that license grants. These terms govern your use of the hosted App.
 
-- Reproduce, duplicate, copy, sell, or resell any portion of the App
+When using the hosted App, you may not:
+
 - Scrape, harvest, or extract data from the App using automated tools (robots, spiders, bots)
-- Reverse engineer, decompile, or attempt to derive source code
 - Remove or alter any proprietary notices or labels
-- Use the App to create competing services
-- Access the App to build a comparable competitive service
 
 ---
 
@@ -42,7 +40,7 @@ Semper Admin makes no representations or warranties, express or implied:
 
 ## 4. Data Accuracy & Freshness Disclaimer
 
-Message Watch is a **news aggregator only**. It fetches military directives from official government sources but:
+Semper Nexus is a **news aggregator only**. It fetches military directives from official government sources but:
 
 - Does **not** verify accuracy or completeness of government data
 - Is **not** responsible for errors, omissions, or delays in government feeds
@@ -61,7 +59,7 @@ Message Watch is a **news aggregator only**. It fetches military directives from
 
 ## 5. No Affiliation with Government
 
-Message Watch is an **unofficial, unauthorized tool** that:
+Semper Nexus is an **unofficial, unauthorized tool** that:
 
 - Is **not** created, endorsed, or maintained by the U.S. Department of Defense
 - Is **not** affiliated with the U.S. Marine Corps or U.S. Navy
