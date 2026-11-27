@@ -59,7 +59,6 @@ Both frontends must serve the Vite build output (`dist`), not the repository roo
 ## Documentation
 
 - [docs/CLOUDGOV-DEPLOY.md](docs/CLOUDGOV-DEPLOY.md): manual cloud.gov deploy steps and post-deploy checks.
-- [docs/DEPLOYMENT-BASELINE.md](docs/DEPLOYMENT-BASELINE.md): deployment topology, health checks and known failure modes.
 - [docs/DATA-REFRESH.md](docs/DATA-REFRESH.md): scripts that refresh the built-in data files.
 
 ## Feedback and support

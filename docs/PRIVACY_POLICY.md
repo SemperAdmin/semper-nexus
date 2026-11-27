@@ -1,4 +1,4 @@
-# Privacy Policy for Message Watch
+# Privacy Policy for Semper Nexus
 
 **Effective Date:** June 2, 2026  
 **Last Updated:** November 27, 2026  
@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-Message Watch ("App") is a web-based application for monitoring publicly available military directives, messages, and publications from United States Department of Defense and military branch official sources. This Privacy Policy explains how we handle your data when you use the App.
+Semper Nexus ("App") is a web-based application for monitoring publicly available military directives, messages, and publications from United States Department of Defense and military branch official sources. This Privacy Policy explains how we handle your data when you use the App.
 
 **Key principle: We do not collect, store, or transmit personally identifiable information (PII) about you.**
 
@@ -20,19 +20,12 @@ The App stores the following data on **your device only** using browser LocalSto
 - Message feed cache (MARADMINs, ALMARs, MCPUBs, ALNAV, SECNAV, JTR, DoD Forms, DoD FMR, IGMC)
 - User preferences (selected message type, date filter range, theme preference)
 - Summary cache timestamps
-- Proxy cache preference (for CORS bypass optimization)
 - Error analytics (JavaScript errors encountered during your session)
 
 **This data never leaves your device.** It is used solely to provide offline access and restore your preferences on subsequent visits.
 
 ### 2.2 Web Performance Metrics (Web Vitals)
-The App loads Google's Web Vitals library (`web-vitals@3.5.0`) from unpkg.com CDN. This library collects anonymous performance metrics:
-
-- Core Web Vitals (Largest Contentful Paint, Cumulative Layout Shift, First Input Delay)
-- Page load time
-- User interaction metrics
-
-**These metrics are collected by Google** and used for performance analysis. Google's data practices are governed by [Google's Privacy Policy](https://policies.google.com/privacy).
+The App includes a copy of the open-source Web Vitals library, served from the App's own site. It measures page performance (such as load time and layout stability) in your browser and writes the results to the browser's developer console only. **These measurements are not sent anywhere.**
 
 ### 2.3 Error Logging (Client-Side)
 The App maintains an error analytics system that logs JavaScript errors and runtime issues:
@@ -84,16 +77,11 @@ The App fetches publicly available military directives and messages from officia
 
 ---
 
-## 5. CORS Proxy Services
+## 5. Feed Proxy
 
-The App uses CORS proxy services to bypass cross-origin restrictions when fetching feeds. The proxy services used may include:
+Browsers cannot read most government feeds directly from another site, so the App fetches them through a small proxy service operated by Semper Admin and hosted on Render (render.com). For each request the proxy receives **only the address of the public page or feed** being fetched, plus the standard connection information any web server sees (such as your IP address), which the hosting provider may log. Your searches, filters and preferences are not sent. Some sources (for example DoD FMR and ALNAV) are requested directly from the official site first.
 
-- corsproxy.io
-- allorigins.win
-- cors-anywhere.herokuapp.com
-- api.codetabs.com
-
-These proxies receive the URL of the public government feeds you request **only**. No personal data is transmitted through these proxies. These third-party services have their own privacy policies that you should review.
+The public third-party CORS relays the App used in the past are no longer used.
 
 ---
 
@@ -112,7 +100,7 @@ The App registers a service worker to enable offline functionality and progressi
 For users in the European Union, processing is based on **legitimate interest** (Article 6(1)(f) GDPR):
 
 - **Interest pursued:** Provide a functional news aggregator for military information
-- **Necessity:** LocalStorage and Web Vitals are necessary for performance and functionality
+- **Necessity:** LocalStorage is necessary for performance and functionality
 - **Balancing test:** No interference with privacy rights; all data is either local-only or anonymized
 
 **No sensitive personal data is processed.** GDPR consent (Article 7) is not required for this App.
@@ -123,7 +111,6 @@ For users in the European Union, processing is based on **legitimate interest** 
 
 - **LocalStorage cache:** Retained until user manually clears browser cache or selects "Clear All Data" (if implemented)
 - **Error logs:** Retained in memory only; cleared on page close
-- **Web Vitals data:** Retained by Google per their [retention policy](https://policies.google.com/privacy)
 
 ---
 
@@ -135,7 +122,7 @@ You have the following rights under GDPR, CCPA, and similar privacy laws:
 
 **Right to Deletion:** Clear your LocalStorage data by using your browser's "Clear Browsing Data" > "Cookies and Cached Content"
 
-**Right to Opt-Out:** Disable Web Vitals by blocking unpkg.com in your browser or ad blocker
+**Right to Opt-Out:** Not applicable; the App does not track you
 
 **Right to Withdraw Consent:** Not applicable; no consent required for this App
 
@@ -145,7 +132,7 @@ You have the following rights under GDPR, CCPA, and similar privacy laws:
 
 - All data is stored locally on your device using browser APIs
 - Data is not encrypted (browser-level security applies)
-- No data is transmitted externally except Web Vitals metrics (HTTPS)
+- Apart from fetching public feeds through the proxy described in section 5 (over HTTPS), the App transmits no data
 - The App does not use authentication; no login credentials are required
 
 ---
@@ -154,9 +141,8 @@ You have the following rights under GDPR, CCPA, and similar privacy laws:
 
 | Service | Purpose | Data Shared |
 |---------|---------|-------------|
-| unpkg.com (Web Vitals) | Performance metrics | Anonymous usage stats |
-| Google (Web Vitals analysis) | Performance analysis | Page load time, user agent |
-| CORS proxies | Bypass CORS restrictions | Public feed URLs only |
+| Semper Admin feed proxy (hosted on Render) | Fetch public feeds and pages | Address of the public page or feed; standard connection data |
+| Hosting platforms (cloud.gov, GitHub Pages) | Serve the App | Standard access logs (see 2.4) |
 | Government sources | Message content | None (read-only) |
 
 ---
@@ -169,7 +155,7 @@ The App is not intended for children under 13. We do not knowingly collect data 
 
 ## 13. International Users
 
-**EU/EEA Users:** This App complies with GDPR. Data processing is minimal (LocalStorage + Web Vitals). No consent is required.
+**EU/EEA Users:** This App complies with GDPR. Data processing is minimal (LocalStorage only). No consent is required.
 
 **California Users:** This App complies with CCPA/CPRA. No "personal information" is sold or shared. Your rights to know, delete, and opt-out are honored via browser controls.
 
@@ -189,7 +175,7 @@ You have the right to lodge a complaint with your local data protection authorit
 
 ## 16. Disclaimer
 
-Message Watch is an **unofficial tool** not affiliated with the United States Marine Corps, United States Navy, Department of Defense, or any government agency. The App provides informational purposes only. Data accuracy and freshness are not guaranteed. Refer to official government sources for authoritative information.
+Semper Nexus is an **unofficial tool** not affiliated with the United States Marine Corps, United States Navy, Department of Defense, or any government agency. The App provides informational purposes only. Data accuracy and freshness are not guaranteed. Refer to official government sources for authoritative information.
 
 ---
 
