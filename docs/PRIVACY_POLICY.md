@@ -1,7 +1,7 @@
 # Privacy Policy for Message Watch
 
 **Effective Date:** June 2, 2026  
-**Last Updated:** June 2, 2026  
+**Last Updated:** November 27, 2026  
 **Operator:** Semper Admin
 
 ## 1. Overview
@@ -44,6 +44,12 @@ The App maintains an error analytics system that logs JavaScript errors and runt
 
 **This data is stored in your browser's memory only and is not transmitted externally.** It is cleared when you close or refresh the page.
 
+### 2.4 Hosting
+The hosting platforms (cloud.gov and GitHub Pages) keep standard web
+server access logs, such as IP address, time, requested page and browser
+type, for operations and security. Semper Admin does not add tracking of
+its own.
+
 ---
 
 ## 3. What Data We Do NOT Collect
@@ -54,7 +60,7 @@ The App **does not**:
 - Use cookies (only LocalStorage for caching)
 - Track your location
 - Access your device camera, microphone, or contacts
-- Record or log your interactions with the App
+- Record or log your interactions with the App (the App itself does not; see Hosting below for platform logs)
 - Transmit any user data to external servers or third parties
 - Monetize or sell user data
 
