@@ -17,6 +17,8 @@ export default defineConfig({
         { src: 'pwa-init.js', dest: '' },
         { src: 'service-worker.js', dest: '' },
         { src: 'semper-tokens.css', dest: '' },
+        // Files browsers and crawlers request at the site root (favicon, apple-touch icons, robots.txt).
+        { src: 'site-root/*', dest: '.', rename: { stripBase: 1 } },
         // Self-hosted web-vitals and DOMPurify, sourced from node_modules so
         // package-lock.json stays the single source of truth. Copying from a
         // committed vendor/ directory instead would silently pin production to
